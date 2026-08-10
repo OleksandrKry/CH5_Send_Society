@@ -309,3 +309,9 @@ struct CalibrationView: View {
 // `TPoseSilhouette` (the visual T-pose guide shape drawn over the camera feed) has moved to
 // Features/Calibration/Components/TPoseSilhouette.swift — a reusable rendering primitive, not page
 // logic, so it lives separately for a frontend developer to find and edit on its own.
+
+// Preview note: same caveat as WallScanView — `ARMeshSceneView`'s live feed needs real hardware,
+// but the T-pose guide/instructions/height input/buttons all render normally in the canvas.
+#Preview {
+    CalibrationView(arManager: ARSessionManager()) { _ in }
+}

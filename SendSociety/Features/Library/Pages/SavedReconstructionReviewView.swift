@@ -1,5 +1,6 @@
 import SwiftUI
 import ARKit
+import SwiftData
 
 /// Renders a single saved `ReconstructionEntry` directly — no Vision, no live ARKit session, just
 /// `ReconstructionView`'s existing `initialWorldPositions`/`initialJointOverrides` loading path
@@ -61,4 +62,39 @@ struct SavedReconstructionReviewView: View {
             isApproximate: entry.isApproximate
         )
     }
+}
+
+// Preview note: `worldPositions` is empty below (the same "wall-only, no climber" state the app
+// itself supports) to keep this mock simple — swap in real `BodyJointName` keys/`SIMD3<Float>`
+// values if you need to preview an actual skeleton's layout.
+#Preview {
+    let container = try! ModelContainer(for: RecordingSession.self, configurations: .init(isStoredInMemoryOnly: true))
+    let context = ModelContext(container)
+    let session = RecordingSession(
+        ownerID: UUID(),
+        title: "Preview Climb",
+        videoFileName: "preview.mp4",
+        videoDurationSeconds: 42,
+        recordingDeviceOrientationRawValue: 1
+    )
+    let entry = ReconstructionEntry(
+        timestampSeconds: 4.2,
+        worldPositions: [:],
+        jointOverrides: nil,
+        leftGrip: nil,
+        rightGrip: nil,
+        leftFoot: nil,
+        rightFoot: nil,
+        leftGripOffsetSeconds: nil,
+        rightGripOffsetSeconds: nil,
+        leftFootOffsetSeconds: nil,
+        rightFootOffsetSeconds: nil
+    )
+    return SavedReconstructionReviewView(
+        entry: entry,
+        session: session,
+        sessionStore: SessionStore(modelContext: context),
+        wallTextureReference: nil,
+        onClose: {}
+    )
 }

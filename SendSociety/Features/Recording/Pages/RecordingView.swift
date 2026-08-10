@@ -82,3 +82,16 @@ struct RecordingView: View {
         }
     }
 }
+
+// Preview note: with `session`/`sessionStore` nil and no recorded URL yet, this shows the
+// pre-recording state (live mesh view + record button) — the post-recording `PlaybackView` state
+// has its own preview in that file.
+#Preview {
+    RecordingView(
+        arManager: ARSessionManager(),
+        recorder: VideoRecorder(),
+        recordedURL: .constant(nil),
+        session: nil,
+        sessionStore: nil
+    ) { _, _, _ in }
+}

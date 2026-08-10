@@ -137,3 +137,28 @@ struct LibraryView: View {
 // `SessionRow` (one row in the library list) has moved to Features/Library/Components/SessionRow.swift
 // — a reusable rendering primitive, not page logic, so it lives separately for a frontend developer
 // to find and edit on its own.
+
+// Preview note: an in-memory, throwaway SwiftData store — nothing here touches the real on-device
+// database. Shows the empty state (no sessions yet); see `#Preview("With sessions")` below for the
+// populated list layout.
+#Preview {
+    LibraryView()
+        .modelContainer(for: RecordingSession.self, inMemory: true)
+}
+
+#Preview("With sessions") {
+    let container = try! ModelContainer(for: RecordingSession.self, configurations: .init(isStoredInMemoryOnly: true))
+    let context = ModelContext(container)
+    for i in 1...3 {
+        let session = RecordingSession(
+            ownerID: UUID(),
+            title: "Preview Climb \(i)",
+            videoFileName: "preview\(i).mp4",
+            videoDurationSeconds: Double(30 + i * 15),
+            recordingDeviceOrientationRawValue: 1
+        )
+        context.insert(session)
+    }
+    return LibraryView()
+        .modelContainer(container)
+}

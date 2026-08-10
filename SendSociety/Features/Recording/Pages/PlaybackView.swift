@@ -155,3 +155,15 @@ struct PlaybackView: View {
 // `PlaybackModel` (the AVPlayer wrapper backing this screen's scrubber) has moved to
 // Features/Shared/Components/PlaybackModel.swift — it's reused as-is by `SessionReviewView`
 // (Library), so it lives in Shared rather than under this feature.
+
+// Preview note: the URL below doesn't point to a real video, so the player area will show black/
+// an error instead of actual footage — everything else (scrubber, buttons, Annotate toggle) still
+// renders normally, which is enough to check this screen's layout without a real recording.
+#Preview {
+    PlaybackView(
+        url: FileManager.default.temporaryDirectory.appendingPathComponent("preview.mp4"),
+        frameStore: RecordedFrameStore(),
+        session: nil,
+        sessionStore: nil
+    ) { _, _, _ in }
+}

@@ -296,3 +296,21 @@ struct ReconstructionView: View {
 // Features/Reconstruction/Components/ReconstructionSceneView.swift — a large, self-contained
 // rendering component this page just instantiates and binds to, not part of this page's own
 // layout code.
+
+// Preview note: no wall mesh/pose sample below, so the 3D view itself renders an empty scene
+// (RealityKit content generally doesn't render live in Xcode's static canvas anyway) — this is
+// mainly useful for checking the header/controls/banners layout without a live AR session.
+#Preview {
+    ReconstructionView(
+        wallAnchors: [],
+        wallTextureReference: nil,
+        poseSample: nil,
+        cameraTransform: nil,
+        depthContext: nil,
+        leftGrip: nil,
+        rightGrip: nil,
+        leftFoot: nil,
+        rightFoot: nil,
+        poseError: nil
+    )
+}

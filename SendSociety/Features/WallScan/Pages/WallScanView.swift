@@ -169,3 +169,11 @@ struct WallScanView: View {
         }
     }
 }
+
+// Preview note: `ARMeshSceneView`'s live camera + mesh feed needs a real LiDAR device to show
+// anything — Xcode's canvas will render this screen's overlay UI (banners, badges, buttons) fine,
+// but the background will just be whatever ARView's default empty state looks like. Useful for
+// checking layout without needing to rebuild on hardware for every tweak.
+#Preview {
+    WallScanView(arManager: ARSessionManager()) {}
+}

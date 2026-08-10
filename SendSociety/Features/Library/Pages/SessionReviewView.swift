@@ -3,6 +3,7 @@ import AVKit
 import ARKit
 import simd
 import UIKit
+import SwiftData
 
 /// Reopens a saved `RecordingSession` — the video plays back with its saved 2D annotations
 /// reappearing at their timestamps, the scrubber shows tick marks for moments that already have a
@@ -262,3 +263,19 @@ struct SessionReviewView: View {
 // `SavedReconstructionReviewView` (the fullScreenCover destination that renders a single saved
 // `ReconstructionEntry`) has moved to Features/Library/Pages/SavedReconstructionReviewView.swift —
 // it's a distinct, self-contained screen rather than a piece of this page's own layout.
+
+// Preview note: an in-memory, unmanaged `RecordingSession` with no real video file behind it —
+// the player area won't show real footage, but the scrubber/annotate/estimate-3D controls all
+// render normally, which is enough to check this screen's layout.
+#Preview {
+    let container = try! ModelContainer(for: RecordingSession.self, configurations: .init(isStoredInMemoryOnly: true))
+    let context = ModelContext(container)
+    let session = RecordingSession(
+        ownerID: UUID(),
+        title: "Preview Climb",
+        videoFileName: "preview.mp4",
+        videoDurationSeconds: 42,
+        recordingDeviceOrientationRawValue: 1
+    )
+    return SessionReviewView(session: session, sessionStore: SessionStore(modelContext: context), onClose: {})
+}
