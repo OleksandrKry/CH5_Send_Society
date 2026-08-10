@@ -7,10 +7,12 @@ import AVKit
 /// video, keyed by timestamp.
 struct RecordingView: View {
     @ObservedObject var arManager: ARSessionManager
-    @StateObject private var recorder = VideoRecorder()
+    // Recorder + recorded URL are owned by ContentView (not this view) and passed in, so that
+    // coming back here from Step 4 ("pick a different moment") re-shows the already-recorded
+    // clip instead of losing it and dropping back to the record button.
+    @ObservedObject var recorder: VideoRecorder
+    @Binding var recordedURL: URL?
     let onGenerate: (URL, RecordedFrameStore, TimeInterval) -> Void
-
-    @State private var recordedURL: URL?
 
     var body: some View {
         ZStack(alignment: .top) {

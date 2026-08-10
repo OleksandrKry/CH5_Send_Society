@@ -1,5 +1,6 @@
 import AVFoundation
 import ARKit
+import UIKit
 
 /// Records ARKit's captured camera frames to an .mp4 via AVAssetWriter, and simultaneously
 /// stores each frame's camera transform + depth data via `RecordedFrameStore`, keyed by the
@@ -107,6 +108,15 @@ final class VideoRecorder: ObservableObject {
             ]
             let input = AVAssetWriterInput(mediaType: .video, outputSettings: settings)
             input.expectsMediaDataInRealTime = true
+            // `frame.capturedImage` is ARKit's raw, native-sensor-orientation buffer — always
+            // landscape, regardless of how the device is actually held. Without this transform,
+            // the written file has no rotation metadata, so any player displays it sideways
+            // relative to however it was actually recorded (this is exactly what was reported:
+            // "recorded in portrait, but plays back in landscape"). Set once, from the
+            // orientation at the moment recording starts — a single video transform can't follow
+            // a mid-recording rotation, which is a standard, unavoidable video limitation, not
+            // specific to this app.
+            input.transform = Self.videoTransform(for: UIDevice.current.orientation)
 
             let adaptor = AVAssetWriterInputPixelBufferAdaptor(
                 assetWriterInput: input,
@@ -124,6 +134,27 @@ final class VideoRecorder: ObservableObject {
             DebugLog.recording.info("AVAssetWriter configured \(width, privacy: .public)x\(height, privacy: .public) -> \(url.lastPathComponent, privacy: .public)")
         } catch {
             DebugLog.recording.error("Failed to create AVAssetWriter: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Standard rear-camera-sensor-to-portrait/landscape rotation for tagging a video track's
+    /// display orientation. The portrait cases are the common, well-established ones (used here
+    /// since this app's primary orientation is portrait); the landscape cases are the same
+    /// standard mapping but historically the more error-prone half of this exact API to get
+    /// right blind — if a landscape recording plays back rotated, swapping these two cases is
+    /// the first thing to try.
+    private static func videoTransform(for orientation: UIDeviceOrientation) -> CGAffineTransform {
+        switch orientation {
+        case .portrait:
+            return CGAffineTransform(rotationAngle: .pi / 2)
+        case .portraitUpsideDown:
+            return CGAffineTransform(rotationAngle: -.pi / 2)
+        case .landscapeLeft:
+            return CGAffineTransform(rotationAngle: .pi)
+        case .landscapeRight:
+            return .identity
+        default: // faceUp/faceDown/unknown — fall back to portrait, this app's primary orientation
+            return CGAffineTransform(rotationAngle: .pi / 2)
         }
     }
 }
