@@ -3,6 +3,14 @@ import Combine
 import simd
 import UIKit
 
+/// CAPTURE MODULE: everything in `Core/Capture/` is about getting real-world data IN — the live
+/// ARSession, camera frames, depth, and the recorded video file. Nothing in this folder knows
+/// about Vision body-pose detection, grip/foot classification, or RealityKit rendering (that's
+/// `Core/Reconstruction/`) or how a session gets saved to disk (that's `Core/Persistence/`).
+/// `ARSessionManager` is this module's main entry point — most other modules only ever need it
+/// (and its `WallTextureReference`) or `VideoRecorder`/`RecordedFrameStore`, not the smaller
+/// helper files.
+///
 /// Owns the single, continuously-running ARSession shared across Steps 1-3.
 ///
 /// CRITICAL: per the build brief, the wall scan and the recording MUST share one ARSession
@@ -80,7 +88,13 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
             configuration.frameSemantics.insert(.sceneDepth)
         }
         configuration.environmentTexturing = .none
-        configuration.planeDetection = [.horizontal, .vertical]
+        // Plane detection was on but nothing in this app ever reads an `ARPlaneAnchor` — the wall
+        // itself comes from `sceneReconstruction`'s mesh + raw depth, never from a detected plane.
+        // It's pure extra per-frame work for output nobody consumes, competing for the same
+        // real-time budget as ARKit's own tracking/SLAM — worth cutting given the reported
+        // "poor slam" tracking degradation and crash during recording (a large, relatively
+        // low-texture climbing wall is already a hard scene for visual tracking on its own; no
+        // reason to also make ARKit hunt for planes in it).
 
         session.run(configuration)
         isRunning = true
@@ -170,7 +184,16 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         latestFrame = frame
-        trackingQuality = Self.quality(for: frame.camera.trackingState)
+        let newQuality = Self.quality(for: frame.camera.trackingState)
+        // Logged only on an actual CHANGE (not every frame) — cheap enum comparison, so this
+        // doesn't reintroduce per-frame log spam, but gives a timeline of exactly when tracking
+        // degraded/recovered relative to recording — useful alongside ARKit's own internal SLAM
+        // diagnostics (e.g. "poor slam ... map_size(5)") for telling whether a crash lines up with
+        // a tracking-quality drop or is unrelated to it.
+        if newQuality != trackingQuality {
+            DebugLog.tracking.info("Tracking quality \(String(describing: self.trackingQuality), privacy: .public) -> \(String(describing: newQuality), privacy: .public) at frame t=\(frame.timestamp, privacy: .public)")
+        }
+        trackingQuality = newQuality
         onFrameUpdate?(frame)
     }
 

@@ -12,12 +12,18 @@ struct RecordingView: View {
     // clip instead of losing it and dropping back to the record button.
     @ObservedObject var recorder: VideoRecorder
     @Binding var recordedURL: URL?
+    /// The session this recording was saved into (see `ContentView.createSessionIfNeeded`), and
+    /// the store to persist further changes through — both nil until the session is actually
+    /// created (right after recording stops), and nil forever if saving failed. `PlaybackView`
+    /// treats both as "annotation/markers unavailable" rather than erroring.
+    let session: RecordingSession?
+    let sessionStore: SessionStore?
     let onGenerate: (URL, RecordedFrameStore, TimeInterval) -> Void
 
     var body: some View {
         ZStack(alignment: .top) {
             if let recordedURL {
-                PlaybackView(url: recordedURL, frameStore: recorder.frameStore, onGenerate: onGenerate)
+                PlaybackView(url: recordedURL, frameStore: recorder.frameStore, session: session, sessionStore: sessionStore, onGenerate: onGenerate)
             } else {
                 ARMeshSceneView(session: arManager.session)
                     .ignoresSafeArea()

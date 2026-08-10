@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import simd
 
@@ -39,7 +40,7 @@ enum TrackingQuality: Equatable {
 
 /// Our own mirror of VNHumanBodyPose3DObservation.JointName (17 joints), kept independent of
 /// the Vision type so non-Vision files (rendering, models) don't need to import Vision.
-enum BodyJointName: String, CaseIterable, Hashable {
+enum BodyJointName: String, CaseIterable, Hashable, Codable {
     case centerHead, topHead
     case centerShoulder, leftShoulder, rightShoulder
     case spine, root
@@ -50,8 +51,10 @@ enum BodyJointName: String, CaseIterable, Hashable {
     case leftAnkle, rightAnkle
 }
 
-/// Real-world segment lengths computed during Step 2 calibration, in meters.
-struct SegmentLengths {
+/// Real-world segment lengths computed during Step 2 calibration, in meters. `Codable` (trivially
+/// — every field is a plain `Float`) so a `CalibrationResult` can be saved with its owning
+/// `RecordingSession`.
+struct SegmentLengths: Codable {
     var height: Float = 0
     var armSpan: Float = 0
     var upperArmLength: Float = 0      // shoulder -> elbow, averaged L/R
@@ -62,18 +65,53 @@ struct SegmentLengths {
     var handSpan: Float = 0            // rough placeholder — the 17-joint set has no finger joints
 }
 
-/// Result of Step 2 calibration: averaged joints + derived segment lengths. In-memory only for
-/// this MVP — no cross-session persistence.
+/// Result of Step 2 calibration: averaged joints + derived segment lengths. Now persisted as part
+/// of a `RecordingSession` (see `Core/Persistence`).
 struct CalibrationResult {
     var segments: SegmentLengths
     var frameCount: Int
     var averagedJoints: [BodyJointName: SIMD3<Float>]
     var capturedAt: Date
+    /// The climber's self-reported height, if they entered one — see
+    /// `CalibrationView.finalizedResult` for how (and whether) this is actually used to adjust
+    /// `segments`. Stored here mainly so the confirmation UI can show "measured vs. entered"
+    /// without needing to thread a second value alongside this struct everywhere it's passed.
+    var enteredHeightMeters: Float? = nil
+}
+
+/// Manual `Codable` — `averagedJoints`'s `SIMD3<Float>` values need `Core/Persistence/
+/// CodableSIMD.swift`'s conformance, which Swift's automatic synthesis failed to recognize across
+/// files (see `WallScanArchive.Metadata`'s doc comment for the full story). Writing this by hand
+/// sidesteps that.
+extension CalibrationResult: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case segments, frameCount, averagedJoints, capturedAt, enteredHeightMeters
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        segments = try container.decode(SegmentLengths.self, forKey: .segments)
+        frameCount = try container.decode(Int.self, forKey: .frameCount)
+        averagedJoints = try container.decode([BodyJointName: SIMD3<Float>].self, forKey: .averagedJoints)
+        capturedAt = try container.decode(Date.self, forKey: .capturedAt)
+        enteredHeightMeters = try container.decodeIfPresent(Float.self, forKey: .enteredHeightMeters)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(segments, forKey: .segments)
+        try container.encode(frameCount, forKey: .frameCount)
+        try container.encode(averagedJoints, forKey: .averagedJoints)
+        try container.encode(capturedAt, forKey: .capturedAt)
+        try container.encodeIfPresent(enteredHeightMeters, forKey: .enteredHeightMeters)
+    }
 }
 
 /// A single skeletal edge for rendering. Hard-coded rather than relying on Vision's
 /// `parentJoint` property, so skeleton rendering doesn't depend on an unverified API shape.
-struct SkeletonBone {
+/// Hashable so `SkeletonPoseEditor`/`ReconstructionEntityBuilder` can track sets of bones (e.g.
+/// which ones are highlighted during a drag) without a separate string-key scheme.
+struct SkeletonBone: Hashable {
     let from: BodyJointName
     let to: BodyJointName
 }
@@ -101,7 +139,7 @@ let skeletonBones: [SkeletonBone] = [
 /// the same reason as `BodyJointName`. Vision has NO 3D hand pose API — these come from the
 /// 2D-only hand request and get their depth from real LiDAR data (see
 /// `BodyPose3DExtractor.detectHands`), not from Vision itself.
-enum HandJointName: String, CaseIterable, Hashable {
+enum HandJointName: String, CaseIterable, Hashable, Codable {
     case wrist
     case thumbCMC, thumbMP, thumbIP, thumbTip
     case indexMCP, indexPIP, indexDIP, indexTip
@@ -126,7 +164,7 @@ let handBones: [HandBone] = [
 /// Fixed vocabulary of hand grip types the coach can be shown, in place of precise (and, per
 /// LiDAR's ~1-3cm real-world accuracy vs. finger-scale detail, unreliable) raw finger
 /// reconstruction — see `GripClassifier`'s doc comment for the full reasoning.
-enum HandGripType: String, CaseIterable {
+enum HandGripType: String, CaseIterable, Codable {
     case jug, openHand, halfCrimp, fullCrimp, pinch, pocket, sloper, undercling, gaston
 
     var displayName: String {
@@ -146,7 +184,7 @@ enum HandGripType: String, CaseIterable {
 
 /// Fixed vocabulary of foot placement types — same classify-then-snap-to-preset approach as
 /// `HandGripType`.
-enum FootPlacementType: String, CaseIterable {
+enum FootPlacementType: String, CaseIterable, Codable {
     case insideEdge, outsideEdge, toe, heelHook, smear
 
     var displayName: String {
@@ -164,14 +202,54 @@ enum FootPlacementType: String, CaseIterable {
 /// score, NOT precise geometry. `confidence` is a heuristic proxy for "how much geometric signal
 /// was available and how clearly it pointed at this category," not a calibrated probability —
 /// see `GripClassifier` for the full caveat.
-struct GripClassification {
+struct GripClassification: Codable {
     let type: HandGripType
     let confidence: Float
 }
 
 /// Result of `GripClassifier.classifyFoot` — same caveats as `GripClassification`, but built from
 /// even less signal (skeleton geometry only, no foot/toe joints exist in Vision's output at all).
-struct FootClassification {
+struct FootClassification: Codable {
     let type: FootPlacementType
     let confidence: Float
+}
+
+// MARK: - 2D annotation markup (Step 4's "draw on the paused view" feature)
+
+/// Which drawing tool made an `AnnotationStroke` — see that type's doc comment for the shape of
+/// `points` each one implies. Declared here (AppCore), not in the SwiftUI file that draws it
+/// (`Features/Reconstruction/AnnotationOverlay.swift`), because `AnnotationStroke` is a persisted
+/// model type: `Core/Persistence/RecordingSession.swift` stores arrays of it directly, and a
+/// persistence file should never need to import a feature's UI file just to compile its own saved
+/// data. `AnnotationOverlay`/`AnnotationToolbar`/`AnnotationState` (the actual drawing surface,
+/// toolbar, and `ObservableObject` state) stay in Features/Reconstruction — those genuinely are UI.
+enum AnnotationTool: String, CaseIterable, Codable {
+    case pen, line, angle
+
+    var systemImage: String {
+        switch self {
+        case .pen: return "pencil"
+        case .line: return "line.diagonal"
+        case .angle: return "angle"
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .pen: return "Pen"
+        case .line: return "Line"
+        case .angle: return "Angle"
+        }
+    }
+}
+
+/// One piece of 2D screen-space markup drawn on a paused Step 4 view — pen (freehand), line
+/// (straight segment), or angle (two segments sharing a vertex, rendered with the angle between
+/// them labeled). Persisted as part of a `RecordingSession`'s saved video annotations/3D
+/// reconstructions (see `VideoAnnotationEntry`/`ReconstructionEntry` in `Core/Persistence`).
+struct AnnotationStroke: Identifiable, Codable, Equatable {
+    var id = UUID()
+    var tool: AnnotationTool
+    /// pen: every sampled point along the drag. line: [start, end]. angle: [vertex, endA, endB].
+    var points: [CGPoint]
 }

@@ -10,7 +10,6 @@ struct RecordedFrameData {
     let imageResolution: CGSize
     let depthMap: CVPixelBuffer?
     let confidenceMap: CVPixelBuffer?
-    let capturedImage: CVPixelBuffer
     /// Device orientation AT THE MOMENT this frame was recorded — NOT something to re-read from
     /// `UIDevice.current.orientation` later. Step 4 processes this frame potentially minutes
     /// after it was captured (after the coach finishes recording, scrubs the video, and taps
@@ -44,14 +43,24 @@ struct RecordedFrameData {
 /// state at this exact moment in the video."
 ///
 /// IMPORTANT GOTCHA: ARKit's `CVPixelBuffer`s (captured image, depth map, confidence map) come
-/// from a reused buffer pool. Simply holding a reference to `frame.capturedImage` across frames
-/// is NOT safe — the underlying memory gets overwritten by later frames, so every "stored" frame
-/// would silently end up showing the same (most recent) image. We deep-copy every buffer before
-/// storing it (see `copy(_:)`). That copy is real CPU + memory cost per frame, so storage is
+/// from a reused buffer pool. Simply holding a reference to one across frames is NOT safe — the
+/// underlying memory gets overwritten by later frames, so every "stored" frame would silently end
+/// up showing the same (most recent) data. We deep-copy the depth/confidence buffers before
+/// storing them (see `copy(_:)`). That copy is real CPU + memory cost per frame, so storage is
 /// capped (`maxStoredFrames`) rather than allowed to grow unbounded for long recordings — past
 /// the cap we keep recording video via AVFoundation (Step 3 playback still works) but stop
 /// storing new depth/transform samples and log a loud, visible warning rather than silently
 /// degrading. This cap is a known MVP limitation to tune after on-device memory testing.
+///
+/// DELIBERATELY DOES NOT STORE `capturedImage`: an on-device crash log showed resident memory at
+/// 1.4GB after only 600 frames (~11s) of recording — a guaranteed OOM kill (SIGKILL, code 9) well
+/// before any real climbing attempt finishes. `capturedImage` (a full-resolution color frame, ~2
+/// orders of magnitude bigger than the depth/confidence maps combined) was the dominant cost.
+/// Since `VideoRecorder` already writes every frame's `capturedImage` to the .mp4 on disk via
+/// `AVAssetWriter`, there was never a need to ALSO hold a second live copy of it in memory for the
+/// entire recording — Step 4 (`ContentView.generate()`) now re-extracts the specific frame(s) it
+/// actually needs from the saved video file on demand, via `VideoFrameExtractor`, exactly like
+/// session review's "Estimate 3D" path already does.
 final class RecordedFrameStore {
     private(set) var framesByTimestamp: [TimeInterval: RecordedFrameData] = [:]
     private(set) var sortedTimestamps: [TimeInterval] = []
@@ -82,7 +91,6 @@ final class RecordedFrameStore {
             }
             return
         }
-        guard let imageCopy = PixelBufferCopy.copy(frame.capturedImage) else { return }
         // Parens are required here: `frame.sceneDepth?.depthMap.flatMap(...)` lets optional
         // chaining swallow `.flatMap` into the chain, so it tries to call `.flatMap` on the
         // unwrapped `CVPixelBuffer` itself (which has no such member) instead of on the
@@ -97,11 +105,20 @@ final class RecordedFrameStore {
             imageResolution: frame.camera.imageResolution,
             depthMap: depthCopy,
             confidenceMap: confidenceCopy,
-            capturedImage: imageCopy,
             deviceOrientation: UIDevice.current.orientation
         )
         framesByTimestamp[frame.timestamp] = data
         sortedTimestamps.append(frame.timestamp)
+    }
+
+    /// Converts a stored frame's raw ARKit session timestamp back into "seconds into the video"
+    /// (the inverse of `nearestFrame`/`nearbyFrames`'s `start + playbackSeconds` math) — needed by
+    /// callers that want to re-extract that exact frame's color image from the saved video file via
+    /// `VideoFrameExtractor` (see this class's doc comment for why `capturedImage` itself isn't
+    /// stored here anymore). Returns nil if recording never started.
+    func playbackSeconds(forTimestamp timestamp: TimeInterval) -> TimeInterval? {
+        guard let start = recordingStartTimestamp else { return nil }
+        return timestamp - start
     }
 
     /// Finds the stored frame closest to `playbackSeconds` into the clip (0 = first recorded

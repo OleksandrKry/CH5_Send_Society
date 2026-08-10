@@ -3,7 +3,9 @@ import ARKit
 import simd
 import UIKit
 
-/// Output of a single VNDetectHumanBodyPose3DRequest call.
+/// Output of a single VNDetectHumanBodyPose3DRequest call. `Codable` (written manually below,
+/// rather than `: Codable` + automatic synthesis) so a generated reconstruction can be saved as
+/// part of a `RecordingSession` (see `Core/Persistence`).
 struct BodyPoseSample {
     /// Joint positions as returned by Vision: translation relative to the skeleton's root
     /// joint (center of the hip), in meters.
@@ -12,6 +14,32 @@ struct BodyPoseSample {
     /// ARKit world space — see `worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)`.
     var cameraOriginMatrix: simd_float4x4
     var bodyHeight: Float
+}
+
+/// Manual `Codable` conformance — Swift's automatic synthesis failed to recognize
+/// `simd_float4x4`'s `Codable` conformance from `Core/Persistence/CodableSIMD.swift` (a different
+/// file in the same target), reported as "does not conform to protocol 'Decodable'" (the same
+/// issue hit `WallScanArchive.Metadata`; see that type's doc comment). Writing the keyed
+/// container decode/encode out by hand only requires `simd_float4x4.init(from:)`/`encode(to:)` to
+/// work for one direct call each, which sidesteps whatever synthesis-visibility quirk that was.
+extension BodyPoseSample: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case rootRelativePositions, cameraOriginMatrix, bodyHeight
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        rootRelativePositions = try container.decode([BodyJointName: SIMD3<Float>].self, forKey: .rootRelativePositions)
+        cameraOriginMatrix = try container.decode(simd_float4x4.self, forKey: .cameraOriginMatrix)
+        bodyHeight = try container.decode(Float.self, forKey: .bodyHeight)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(rootRelativePositions, forKey: .rootRelativePositions)
+        try container.encode(cameraOriginMatrix, forKey: .cameraOriginMatrix)
+        try container.encode(bodyHeight, forKey: .bodyHeight)
+    }
 }
 
 enum BodyPoseError: Error {
@@ -26,6 +54,27 @@ enum BodyPoseError: Error {
 struct HandPoseSample {
     var leftHandJoints: [HandJointName: SIMD3<Float>] = [:]
     var rightHandJoints: [HandJointName: SIMD3<Float>] = [:]
+}
+
+/// Manual `Codable` for the same reason as `BodyPoseSample` above — kept consistent even though
+/// this one's only simd usage is inside dictionary values, since that still needs
+/// `SIMD3<Float>: Decodable` resolvable at the same synthesis point that failed there.
+extension HandPoseSample: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case leftHandJoints, rightHandJoints
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        leftHandJoints = try container.decode([HandJointName: SIMD3<Float>].self, forKey: .leftHandJoints)
+        rightHandJoints = try container.decode([HandJointName: SIMD3<Float>].self, forKey: .rightHandJoints)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(leftHandJoints, forKey: .leftHandJoints)
+        try container.encode(rightHandJoints, forKey: .rightHandJoints)
+    }
 }
 
 enum BodyPose3DExtractor {
@@ -60,12 +109,38 @@ enum BodyPose3DExtractor {
     /// from how it was actually held when this specific frame was captured. This exact mismatch
     /// was the root cause of the skeleton coming out rotated relative to the wall in Step 4.
     static func detect(in pixelBuffer: CVPixelBuffer, deviceOrientation: UIDeviceOrientation = UIDevice.current.orientation) throws -> BodyPoseSample {
-        let request = VNDetectHumanBodyPose3DRequest()
-        let handler = VNImageRequestHandler(
+        try runDetection(handler: VNImageRequestHandler(
             cvPixelBuffer: pixelBuffer,
             orientation: cameraOrientation(for: deviceOrientation),
             options: [:]
-        )
+        ))
+    }
+
+    /// Same request, for a `CGImage` pulled out of a SAVED video file (`VideoFrameExtractor`)
+    /// rather than a live/stored ARKit pixel buffer — used by session review's "Estimate 3D" (see
+    /// `SessionReviewView.generateEstimate`).
+    ///
+    /// `deviceOrientation` MUST be the same orientation the phone was held in when this recording
+    /// was made (`RecordingSession.recordingDeviceOrientationRawValue`, captured once by
+    /// `VideoRecorder` at recording start) — NOT a fixed `.up`. `VideoFrameExtractor` deliberately
+    /// returns the video's RAW native pixel layout (same as ARKit's `capturedImage`, never
+    /// rotated), so this needs the exact same `cameraOrientation(for:)` interpretation
+    /// `detect(in:deviceOrientation:)` uses for live frames. Passing a fixed `.up` here (as an
+    /// earlier version of this function did, paired with an already-upright extracted image) is
+    /// what caused a re-generated reconstruction's posture to come out facing the wrong direction
+    /// compared to the SAME clip's live-generated ones: Vision's reported joint axes are relative
+    /// to whatever orientation it's TOLD the image is in, and that assumption has to match the
+    /// actual pixel layout it's given, exactly like the live path already requires.
+    static func detect(inVideoFrame cgImage: CGImage, deviceOrientation: UIDeviceOrientation) throws -> BodyPoseSample {
+        try runDetection(handler: VNImageRequestHandler(
+            cgImage: cgImage,
+            orientation: cameraOrientation(for: deviceOrientation),
+            options: [:]
+        ))
+    }
+
+    private static func runDetection(handler: VNImageRequestHandler) throws -> BodyPoseSample {
+        let request = VNDetectHumanBodyPose3DRequest()
         do {
             try handler.perform([request])
         } catch {
@@ -132,14 +207,21 @@ enum BodyPose3DExtractor {
     /// its depth guess with LiDAR's actual measurement at that pixel.
     ///
     /// Returns a CAMERA-SPACE position (ARKit convention — combine with `cameraTransform` to get
-    /// world space), or nil if depth isn't available/confident at that pixel, or if the LiDAR
-    /// and Vision readings disagree wildly (guards against a sign/axis convention bug silently
-    /// producing a garbage position rather than just a slightly-off one).
+    /// world space) and whether it's actually LiDAR-grounded. NEVER returns nil — every early-out
+    /// below (behind the camera, projected outside the frame, no confident depth nearby, or LiDAR
+    /// and Vision disagreeing wildly) falls back to `visionOnlyFallback` (Vision's own, less
+    /// reliable, depth-from-camera estimate for THIS joint) with `isGrounded: false`, rather than
+    /// discarding the position entirely. Callers that need an all-or-nothing per-FRAME answer
+    /// (`groundAllJoints`, used by calibration's cross-frame averaging — see its doc comment for
+    /// why partial results are actually harmful there) just check `isGrounded` and bail themselves;
+    /// callers that want to keep whatever real depth they can get on a per-JOINT basis
+    /// (`groundJointsBestEffort`, used by Step 4's single-frame skeleton) use the returned position
+    /// either way.
     ///
     /// Same grounding math as before, but taking already-locked raw buffer pointers instead of a
-    /// `DepthGroundingContext` — factored out so `groundAllJoints` can lock the depth/confidence
-    /// buffers ONCE for all 17 joints instead of re-locking per joint (locking is cheap per call,
-    /// but Step 2 calls this at ~15Hz live, so it adds up).
+    /// `DepthGroundingContext` — factored out so callers can lock the depth/confidence buffers
+    /// ONCE for all 17 joints instead of re-locking per joint (locking is cheap per call, but
+    /// Step 2 calls this at ~15Hz live, so it adds up).
     private static func lidarGroundedCameraSpacePosition(
         rootRelative: SIMD3<Float>,
         cameraOriginMatrix: simd_float4x4,
@@ -152,16 +234,17 @@ enum BodyPose3DExtractor {
         depthBytesPerRow: Int,
         confidenceBase: UnsafeMutableRawPointer?,
         confidenceBytesPerRow: Int
-    ) -> SIMD3<Float>? {
+    ) -> (position: SIMD3<Float>, isGrounded: Bool) {
         let local = SIMD4<Float>(rootRelative.x, rootRelative.y, rootRelative.z, 1)
         let visionCameraSpace4 = cameraOriginMatrix * local
+        let visionOnlyFallback = SIMD3<Float>(visionCameraSpace4.x, visionCameraSpace4.y, visionCameraSpace4.z)
 
         // ARKit camera space: X-right, Y-up, Z-backward (camera looks down -Z). Convert to the
         // standard pixel-projection convention (X-right, Y-down, Z-forward-positive).
         let xCV = visionCameraSpace4.x
         let yCV = -visionCameraSpace4.y
         let zCV = -visionCameraSpace4.z
-        guard zCV > 0.05 else { return nil } // behind or basically at the camera — degenerate
+        guard zCV > 0.05 else { return (visionOnlyFallback, false) } // behind/at the camera — degenerate
 
         // `detect(in:)` runs Vision with an orientation hint so ITS OWN body-pose detection sees
         // an upright person — but that means (xCV, yCV) above is a bearing in that ROTATED/
@@ -188,26 +271,33 @@ enum BodyPose3DExtractor {
 
         let u = fx * rawX / zCV + cx
         let v = fy * rawY / zCV + cy
-        guard u >= 0, v >= 0, u < width, v < height else { return nil } // projected outside the frame
+        guard u >= 0, v >= 0, u < width, v < height else { return (visionOnlyFallback, false) } // projected outside the frame
 
         let depthX = Int(u / width * Float(depthWidth))
         let depthY = Int(v / height * Float(depthHeight))
-        guard depthX >= 0, depthX < depthWidth, depthY >= 0, depthY < depthHeight else { return nil }
+        guard depthX >= 0, depthX < depthWidth, depthY >= 0, depthY < depthHeight else { return (visionOnlyFallback, false) }
 
         guard let lidarDepth = nearestConfidentDepth(
             depthBase: depthBase, depthBytesPerRow: depthBytesPerRow,
             confidenceBase: confidenceBase, confidenceBytesPerRow: confidenceBytesPerRow,
             width: depthWidth, height: depthHeight, x: depthX, y: depthY
         ) else {
-            return nil
+            return (visionOnlyFallback, false)
         }
 
         // Sanity guard: reject if LiDAR and Vision wildly disagree, rather than silently
-        // producing a garbage position from a sign/axis bug.
+        // producing a garbage position from a sign/axis bug. In practice this fires most often at
+        // a body-edge pixel where the confidence-dropout neighbor search (`nearestConfidentDepth`)
+        // latches onto the WALL behind/beside the joint instead of the joint itself (e.g. a hand
+        // near a hold, where the hand's own depth reading is unreliable but the wall right next to
+        // it isn't) — a real, confident LiDAR reading, just of the wrong surface, not a sign/axis
+        // bug. Rejecting it here and falling back to Vision-only for JUST this one joint (rather
+        // than the whole frame — see `groundJointsBestEffort`) is what keeps that single bad
+        // reading from throwing away every other joint's perfectly good real depth.
         let ratio = lidarDepth / zCV
         guard ratio.isFinite, ratio > 0.3, ratio < 3.0 else {
             DebugLog.reconstruction.error("LiDAR grounding rejected an outlier joint (LiDAR=\(lidarDepth, privacy: .public)m vs Vision=\(zCV, privacy: .public)m)")
-            return nil
+            return (visionOnlyFallback, false)
         }
 
         // Unproject the SAME pixel using LiDAR's real depth instead of Vision's estimated
@@ -215,7 +305,7 @@ enum BodyPose3DExtractor {
         // unreliable) depth-from-camera estimate with a real sensor measurement.
         let trueXcv = (u - cx) * lidarDepth / fx
         let trueYcv = (v - cy) * lidarDepth / fy
-        return SIMD3<Float>(trueXcv, -trueYcv, -lidarDepth)
+        return (SIMD3<Float>(trueXcv, -trueYcv, -lidarDepth), true)
     }
 
     /// Rotates a bearing that's in Vision's "corrected/upright" image-plane convention (X-right,
@@ -260,53 +350,154 @@ enum BodyPose3DExtractor {
     /// which would distort every distance/height measurement between a grounded and
     /// un-grounded joint. Callers should fall back to the un-grounded `worldPosition` for the
     /// WHOLE frame when this returns nil.
+    ///
+    /// USE THIS for calibration's cross-frame height averaging (`CalibrationView`), where mixing
+    /// grounded and ungrounded joints WITHIN one frame's average would corrupt the result. For
+    /// Step 4's single-frame skeleton display, use `groundJointsBestEffort` instead — see its doc
+    /// comment for why an all-or-nothing per-frame result is the wrong tradeoff there.
     static func groundAllJoints(
         _ positions: [BodyJointName: SIMD3<Float>],
         cameraOriginMatrix: simd_float4x4,
         context: DepthGroundingContext
     ) -> [BodyJointName: SIMD3<Float>]? {
+        guard let buffers = lockedDepthBuffers(context: context) else { return nil }
+        defer { buffers.unlock() }
+
+        var grounded: [BodyJointName: SIMD3<Float>] = [:]
+        grounded.reserveCapacity(positions.count)
+        for (joint, local) in positions {
+            let result = lidarGroundedCameraSpacePosition(
+                rootRelative: local,
+                cameraOriginMatrix: cameraOriginMatrix,
+                intrinsics: context.intrinsics,
+                imageResolution: context.imageResolution,
+                deviceOrientation: context.deviceOrientation,
+                depthWidth: buffers.depthWidth,
+                depthHeight: buffers.depthHeight,
+                depthBase: buffers.depthBase,
+                depthBytesPerRow: buffers.depthBytesPerRow,
+                confidenceBase: buffers.confidenceBase,
+                confidenceBytesPerRow: buffers.confidenceBytesPerRow
+            )
+            guard result.isGrounded else { return nil }
+            grounded[joint] = result.position
+        }
+        return grounded
+    }
+
+    /// Grounds as many joints as possible in real LiDAR depth, keeping Vision's own estimate ONLY
+    /// for the specific joint(s) that couldn't be grounded — unlike `groundAllJoints`, one bad
+    /// joint (e.g. a hand's confidence-dropout neighbor search latching onto the wall behind it —
+    /// see `lidarGroundedCameraSpacePosition`'s sanity-guard doc comment) no longer throws away
+    /// every OTHER joint's perfectly good real depth measurement too.
+    ///
+    /// Use this for Step 4's single-frame skeleton (`ReconstructionEntityBuilder.worldJointPositions`),
+    /// where a real recording easily has depth data for 16/17 joints and "17/17 joints are less
+    /// accurate" is a strictly worse outcome than "16/17 joints are accurate, one is estimated."
+    /// Do NOT use this for cross-frame averaging (calibration) — see `groundAllJoints`'s doc
+    /// comment for why partial-per-frame results are actually harmful there.
+    ///
+    /// Returns the positions (always one per input joint) plus the set of joints that fell back to
+    /// Vision-only, so callers can log or visually flag exactly which ones are less certain.
+    static func groundJointsBestEffort(
+        _ positions: [BodyJointName: SIMD3<Float>],
+        cameraOriginMatrix: simd_float4x4,
+        context: DepthGroundingContext
+    ) -> (positions: [BodyJointName: SIMD3<Float>], ungroundedJoints: Set<BodyJointName>) {
+        guard let buffers = lockedDepthBuffers(context: context) else {
+            // No usable depth buffer at all — every joint falls back to Vision-only via the same
+            // per-joint math `worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)`
+            // uses, computed here directly since there's no depth context to pass through.
+            var fallback: [BodyJointName: SIMD3<Float>] = [:]
+            for (joint, local) in positions {
+                let local4 = SIMD4<Float>(local.x, local.y, local.z, 1)
+                let cameraSpace4 = cameraOriginMatrix * local4
+                fallback[joint] = SIMD3<Float>(cameraSpace4.x, cameraSpace4.y, cameraSpace4.z)
+            }
+            return (fallback, Set(positions.keys))
+        }
+        defer { buffers.unlock() }
+
+        var grounded: [BodyJointName: SIMD3<Float>] = [:]
+        grounded.reserveCapacity(positions.count)
+        var ungrounded: Set<BodyJointName> = []
+        for (joint, local) in positions {
+            let result = lidarGroundedCameraSpacePosition(
+                rootRelative: local,
+                cameraOriginMatrix: cameraOriginMatrix,
+                intrinsics: context.intrinsics,
+                imageResolution: context.imageResolution,
+                deviceOrientation: context.deviceOrientation,
+                depthWidth: buffers.depthWidth,
+                depthHeight: buffers.depthHeight,
+                depthBase: buffers.depthBase,
+                depthBytesPerRow: buffers.depthBytesPerRow,
+                confidenceBase: buffers.confidenceBase,
+                confidenceBytesPerRow: buffers.confidenceBytesPerRow
+            )
+            grounded[joint] = result.position
+            if !result.isGrounded {
+                ungrounded.insert(joint)
+            }
+        }
+        if !ungrounded.isEmpty {
+            let names = ungrounded.map(\.rawValue).sorted().joined(separator: ", ")
+            DebugLog.reconstruction.error("Step 4: \(ungrounded.count, privacy: .public)/\(positions.count, privacy: .public) joint(s) fell back to Vision-only depth (\(names, privacy: .public)) — the rest kept real LiDAR grounding")
+        }
+        return (grounded, ungrounded)
+    }
+
+    /// Locks `context`'s depth (and, if present, confidence) buffers once and returns everything
+    /// `lidarGroundedCameraSpacePosition` needs to read from them — shared by `groundAllJoints` and
+    /// `groundJointsBestEffort` so both lock ONCE for all 17 joints rather than per-joint (locking
+    /// is cheap per call, but Step 2 calls this at ~15Hz live, so it adds up). Caller MUST call
+    /// `unlock()` (typically via `defer`) exactly once, whether or not this returns nil.
+    private struct LockedDepthBuffers {
+        let depthWidth: Int
+        let depthHeight: Int
+        let depthBase: UnsafeMutableRawPointer
+        let depthBytesPerRow: Int
+        let confidenceBase: UnsafeMutableRawPointer?
+        let confidenceBytesPerRow: Int
+        let depthMap: CVPixelBuffer
+        let confidenceMap: CVPixelBuffer?
+
+        func unlock() {
+            CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
+            if let confidenceMap {
+                CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly)
+            }
+        }
+    }
+
+    private static func lockedDepthBuffers(context: DepthGroundingContext) -> LockedDepthBuffers? {
         let depthMap = context.depthMap
         let depthWidth = CVPixelBufferGetWidth(depthMap)
         let depthHeight = CVPixelBufferGetHeight(depthMap)
-
         CVPixelBufferLockBaseAddress(depthMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
-        guard let depthBase = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
+        guard let depthBase = CVPixelBufferGetBaseAddress(depthMap) else {
+            CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
+            return nil
+        }
         let depthBytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
 
         let confidenceMap = context.confidenceMap
         if let confidenceMap {
             CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
         }
-        defer {
-            if let confidenceMap {
-                CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly)
-            }
-        }
         let confidenceBase = confidenceMap.flatMap { CVPixelBufferGetBaseAddress($0) }
         let confidenceBytesPerRow = confidenceMap.map { CVPixelBufferGetBytesPerRow($0) } ?? 0
 
-        var grounded: [BodyJointName: SIMD3<Float>] = [:]
-        grounded.reserveCapacity(positions.count)
-        for (joint, local) in positions {
-            guard let point = lidarGroundedCameraSpacePosition(
-                rootRelative: local,
-                cameraOriginMatrix: cameraOriginMatrix,
-                intrinsics: context.intrinsics,
-                imageResolution: context.imageResolution,
-                deviceOrientation: context.deviceOrientation,
-                depthWidth: depthWidth,
-                depthHeight: depthHeight,
-                depthBase: depthBase,
-                depthBytesPerRow: depthBytesPerRow,
-                confidenceBase: confidenceBase,
-                confidenceBytesPerRow: confidenceBytesPerRow
-            ) else {
-                return nil
-            }
-            grounded[joint] = point
-        }
-        return grounded
+        return LockedDepthBuffers(
+            depthWidth: depthWidth,
+            depthHeight: depthHeight,
+            depthBase: depthBase,
+            depthBytesPerRow: depthBytesPerRow,
+            confidenceBase: confidenceBase,
+            confidenceBytesPerRow: confidenceBytesPerRow,
+            depthMap: depthMap,
+            confidenceMap: confidenceMap
+        )
     }
 
     /// Searches a small expanding-ring neighborhood around (x,y) for the nearest pixel with a
@@ -433,9 +624,30 @@ enum BodyPose3DExtractor {
     /// less reliable in portrait (hands appear sideways to the detector) — acceptable since
     /// Step 4 only needs ONE good frame and the coach can try a different paused moment.
     static func detectHands(in pixelBuffer: CVPixelBuffer, context: DepthGroundingContext) -> HandPoseSample {
+        runHandDetection(
+            handler: VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:]),
+            context: context
+        )
+    }
+
+    /// Same request, for a `CGImage` pulled from a saved video file (`VideoFrameExtractor`)
+    /// instead of a live/stored ARKit pixel buffer — used by Step 4 (`ContentView.generate()`),
+    /// which no longer keeps a live in-memory copy of every recorded frame's color image (see
+    /// `RecordedFrameStore`'s doc comment for why: it was the direct cause of an on-device OOM
+    /// kill). `cgImage` must be the RAW, unrotated frame (same convention as
+    /// `VideoFrameExtractor.extractFrame`/`detect(inVideoFrame:deviceOrientation:)`) — orientation
+    /// is still `.up` here regardless, for the same reason the pixel-buffer overload uses `.up`
+    /// (see this function's main doc comment above).
+    static func detectHands(inVideoFrame cgImage: CGImage, context: DepthGroundingContext) -> HandPoseSample {
+        runHandDetection(
+            handler: VNImageRequestHandler(cgImage: cgImage, orientation: .up, options: [:]),
+            context: context
+        )
+    }
+
+    private static func runHandDetection(handler: VNImageRequestHandler, context: DepthGroundingContext) -> HandPoseSample {
         let request = VNDetectHumanHandPoseRequest()
         request.maximumHandCount = 2
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
         do {
             try handler.perform([request])
         } catch {

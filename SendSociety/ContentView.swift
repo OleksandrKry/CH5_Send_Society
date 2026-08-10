@@ -1,11 +1,17 @@
 import SwiftUI
 import ARKit
 import simd
+import SwiftData
 
 /// Root navigation for the 4-step MVP pipeline. Owns the single shared ARSessionManager
 /// instance for the lifetime of the app so Steps 1-3 always see the same ARSession (see
 /// ARSessionManager's doc comment for why this matters).
+///
+/// This view is now only ever reached via `LibraryView`'s "New Recording" entry point, and always
+/// returns to it when the flow finishes (see `onFinished`) — see `LibraryView`'s doc comment for
+/// the overall navigation shape.
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var arManager = ARSessionManager()
     @State private var step: AppStep = .wallScan
     @State private var calibration: CalibrationResult?
@@ -16,6 +22,27 @@ struct ContentView: View {
     @StateObject private var recorder = VideoRecorder()
     @State private var recordedURL: URL?
 
+    /// Lazily constructed once `modelContext` is available (it isn't yet during `init`, since
+    /// `@Environment` values aren't resolved until the view is actually part of the hierarchy).
+    @State private var sessionStore: SessionStore?
+    /// The `RecordingSession` for THIS run through the pipeline, created the moment Step 3
+    /// finishes recording (as soon as there's a video + whatever wall scan/calibration data
+    /// exists to save alongside it) — see requirement #3's "every state should be saved." Every
+    /// video annotation and 3D reconstruction made for the rest of this flow gets folded into this
+    /// same session object.
+    @State private var currentSession: RecordingSession?
+    /// Non-nil when `createSessionIfNeeded` fails — drives a blocking alert (see `body`) so a save
+    /// failure is visible ON SCREEN rather than only in a console log (which needs a tethered
+    /// device to read). Added after exactly this happened silently: a full recording -> Step 4 ->
+    /// Done flow completed with no visible error, and the coach found an empty Library list with no
+    /// way to tell why. The recording/reconstruction flow itself still works even when this fires —
+    /// `currentSession` just stays nil, so nothing from this run gets persisted (see
+    /// `ReconstructionHost.upsertReconstruction()`'s nil-session no-op).
+    @State private var saveErrorMessage: String?
+    /// Called when the coach is done with this recording (explicit "Done" from Step 4, or backing
+    /// out) — returns to `LibraryView`. Set by whichever parent presented this view.
+    var onFinished: () -> Void = {}
+
     var body: some View {
         Group {
             if !LiDARSupport.isSupported {
@@ -23,6 +50,23 @@ struct ContentView: View {
             } else {
                 stepContent
             }
+        }
+        .onAppear {
+            if sessionStore == nil {
+                sessionStore = SessionStore(modelContext: modelContext)
+            }
+        }
+        .alert(
+            "Couldn't Save Recording",
+            isPresented: Binding(
+                get: { saveErrorMessage != nil },
+                set: { isPresented in if !isPresented { saveErrorMessage = nil } }
+            ),
+            presenting: saveErrorMessage
+        ) { _ in
+            Button("OK") { saveErrorMessage = nil }
+        } message: { message in
+            Text(message)
         }
     }
 
@@ -39,18 +83,51 @@ struct ContentView: View {
                 step = .recording
             }
         case .recording:
-            RecordingView(arManager: arManager, recorder: recorder, recordedURL: $recordedURL) { url, frameStore, pausedSeconds in
+            RecordingView(arManager: arManager, recorder: recorder, recordedURL: $recordedURL, session: currentSession, sessionStore: sessionStore) { url, frameStore, pausedSeconds in
                 reconstructionInput = ReconstructionInput(videoURL: url, frameStore: frameStore, pausedSeconds: pausedSeconds)
                 step = .reconstruction
             }
+            .onChange(of: recordedURL) { _, newValue in
+                createSessionIfNeeded(videoTempURL: newValue)
+            }
         case .reconstruction:
             if let input = reconstructionInput {
-                ReconstructionHost(arManager: arManager, input: input) {
+                ReconstructionHost(arManager: arManager, input: input, session: currentSession, sessionStore: sessionStore, onBack: {
                     // recordedURL is still set (owned by ContentView), so re-entering .recording
                     // goes straight back to the scrubber instead of the record button.
                     step = .recording
-                }
+                }, onFinished: onFinished)
             }
+        }
+    }
+
+    /// Saves the just-recorded video (plus whatever wall scan/calibration data exists so far) as a
+    /// new `RecordingSession` the moment recording stops — see `currentSession`'s doc comment.
+    /// Guarded so navigating back to Step 3 and stopping a re-record doesn't create a second
+    /// session for what's still conceptually the same pipeline run (a coach who genuinely wants a
+    /// separate session re-records from Library's "New Recording" instead).
+    private func createSessionIfNeeded(videoTempURL: URL?) {
+        guard let videoTempURL, currentSession == nil, let sessionStore else { return }
+        let title = "Climb — " + Date().formatted(date: .abbreviated, time: .shortened)
+        do {
+            currentSession = try sessionStore.createSession(
+                title: title,
+                videoTempURL: videoTempURL,
+                videoDurationSeconds: recorder.lastRecordingDuration,
+                recordingDeviceOrientationRawValue: recorder.recordingDeviceOrientation.rawValue,
+                wallTextureReference: arManager.wallTextureReference,
+                calibration: calibration
+            )
+        } catch {
+            // See `saveErrorMessage`'s doc comment — this used to fail completely silently, with
+            // the recording/reconstruction flow continuing to work normally and just quietly never
+            // persisting anything, which is indistinguishable from "it worked" until you go back to
+            // an empty Library list. `error.localizedDescription` on a `CocoaError` from
+            // `FileManager` (the likely failure here — see `SessionFileStore`) is usually specific
+            // enough to act on directly, e.g. "There isn't enough space" for a full disk.
+            let description = error.localizedDescription
+            saveErrorMessage = "This recording's video couldn't be saved, so it won't appear in your library: \(description)"
+            DebugLog.recording.error("createSessionIfNeeded failed: \(description, privacy: .public)")
         }
     }
 
@@ -85,10 +162,21 @@ struct ReconstructionInput {
 private struct ReconstructionHost: View {
     let arManager: ARSessionManager
     let input: ReconstructionInput
+    /// The current pipeline run's session, if saving succeeded (see `ContentView.currentSession`)
+    /// — nil is handled gracefully throughout (every save call below just no-ops), so a wall-scan
+    /// or video-migration failure earlier in the flow doesn't block Step 4 from working, just from
+    /// persisting.
+    let session: RecordingSession?
+    let sessionStore: SessionStore?
     let onBack: () -> Void
+    var onFinished: () -> Void = {}
 
     @State private var poseSample: BodyPoseSample?
     @State private var cameraTransform: simd_float4x4 = matrix_identity_float4x4
+    /// See `ReconstructionView.cameraTransform`'s doc comment — nil unless `generate()` just ran a
+    /// fresh detection against real stored frame data, so `ReconstructionView` never seeds its
+    /// camera from a meaningless placeholder transform.
+    @State private var recordingCameraTransform: simd_float4x4?
     @State private var depthContext: BodyPose3DExtractor.DepthGroundingContext?
     /// Classify-then-snap-to-preset results for each limb — see `GripClassifier`. Each is
     /// computed for the exact paused frame first; if confidence comes in below
@@ -109,6 +197,28 @@ private struct ReconstructionHost: View {
     @State private var poseError: String?
     @State private var isReady = false
 
+    /// Set either by loading an existing `ReconstructionEntry` near `input.pausedSeconds`, or by
+    /// computing fresh detected positions after a successful Vision call — see `generate()`. This
+    /// is what actually gets rendered (via `ReconstructionView.initialWorldPositions`) AND what
+    /// every subsequent `upsertReconstruction()` call writes back as `ReconstructionEntry
+    /// .worldPositions` — it's the stable "auto-detected baseline," never the coach's edits.
+    @State private var entryBaseWorldPositions: [BodyJointName: SIMD3<Float>] = [:]
+    @State private var entryTimestamp: Double = 0
+    /// True once a saved `ReconstructionEntry` was found and loaded for this exact paused moment —
+    /// when true, Vision is never run at all (see `generate()` and `RecordingSession`'s doc comment
+    /// on why a previously-unanalyzed timestamp in a revisited session can't get a NEW
+    /// reconstruction after the fact — this isn't that case, since the coach paused at the same
+    /// spot a reconstruction already exists for).
+    @State private var loadedFromSavedEntry = false
+    @State private var initialWorldPositions: [BodyJointName: SIMD3<Float>]?
+    @State private var initialJointOverrides: [BodyJointName: SIMD3<Float>]?
+    @State private var initialAnnotationStrokes: [AnnotationStroke] = []
+    /// Mirrors of whatever `ReconstructionView` currently has for these — updated by its
+    /// onChange callbacks, and written into the saved `ReconstructionEntry` on every change (see
+    /// `upsertReconstruction()`).
+    @State private var lastJointOverrides: [BodyJointName: SIMD3<Float>]?
+    @State private var lastAnnotationStrokes: [AnnotationStroke] = []
+
     var body: some View {
         Group {
             if isReady {
@@ -119,7 +229,7 @@ private struct ReconstructionHost: View {
                     wallAnchors: arManager.wallMeshSnapshot,
                     wallTextureReference: arManager.wallTextureReference,
                     poseSample: poseSample,
-                    cameraTransform: cameraTransform,
+                    cameraTransform: recordingCameraTransform,
                     depthContext: depthContext,
                     leftGrip: leftGrip,
                     rightGrip: rightGrip,
@@ -130,7 +240,19 @@ private struct ReconstructionHost: View {
                     leftFootOffsetSeconds: leftFootOffsetSeconds,
                     rightFootOffsetSeconds: rightFootOffsetSeconds,
                     poseError: poseError,
-                    onBack: onBack
+                    onBack: onBack,
+                    onFinished: onFinished,
+                    initialAnnotationStrokes: initialAnnotationStrokes,
+                    onAnnotationStrokesChanged: { strokes in
+                        lastAnnotationStrokes = strokes
+                        upsertReconstruction()
+                    },
+                    initialWorldPositions: initialWorldPositions,
+                    initialJointOverrides: initialJointOverrides,
+                    onJointOverridesChanged: { overrides in
+                        lastJointOverrides = overrides
+                        upsertReconstruction()
+                    }
                 )
             } else {
                 ProgressView("Reconstructing…")
@@ -139,112 +261,103 @@ private struct ReconstructionHost: View {
         .onAppear(perform: generate)
     }
 
-    private func generate() {
-        guard let frameData = input.frameStore.nearestFrame(toPlaybackSeconds: input.pausedSeconds) else {
-            poseError = "No stored depth/camera data for this moment in the video."
-            let seconds = input.pausedSeconds
-            DebugLog.reconstruction.error("No RecordedFrameData found near playback second \(seconds, privacy: .public)")
-            isReady = true
-            return
-        }
-        cameraTransform = frameData.cameraTransform
-        // Same real depth data the wall mesh itself was built from — this is what lets Step 4
-        // place the skeleton against the wall using real measurements instead of Vision's own
-        // (much less reliable) depth estimate.
-        depthContext = frameData.depthGroundingContext
-        if depthContext == nil {
-            DebugLog.reconstruction.error("No depth data for this paused frame — skeleton placement will use Vision's raw (less accurate) estimate")
-        }
-        do {
-            // MUST use frameData's OWN stored orientation, not "current" — Step 4 can run
-            // minutes after this frame was actually recorded, by which point the device may be
-            // held completely differently. Using current orientation here was the real root
-            // cause of the skeleton coming out rotated relative to the wall (see
-            // RecordedFrameData.deviceOrientation's doc comment for the full story).
-            poseSample = try BodyPose3DExtractor.detect(in: frameData.capturedImage, deviceOrientation: frameData.deviceOrientation)
-        } catch {
-            poseError = "No body pose detected in this frame — try a different moment in the video."
-            let description = String(describing: error)
-            DebugLog.reconstruction.error("Body pose detection failed for reconstruction: \(description, privacy: .public)")
-        }
-        guard let poseSample else {
-            // No body detected at all in this frame — nothing to classify grips/feet against
-            // (classification needs real wrist/ankle world positions). `poseError` above already
-            // tells the coach to try a different moment.
-            isReady = true
-            return
-        }
-
-        // Grip/foot-placement classification replaces raw finger/toe reconstruction here — see
-        // GripClassifier's doc comment for why. Hand landmarks (whatever Vision could detect,
-        // which is often sparse or empty on an occluded grip) are still computed as an INPUT to
-        // classification, same as before — they're just no longer rendered directly as raw
-        // fingertip geometry.
-        let mainHandSample: HandPoseSample? = depthContext.map {
-            BodyPose3DExtractor.detectHands(in: frameData.capturedImage, context: $0)
-        }
-        let mainClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-            poseSample: poseSample,
-            cameraTransform: cameraTransform,
-            depthContext: depthContext,
-            handSample: mainHandSample,
-            handCameraTransform: cameraTransform,
-            wallReference: arManager.wallTextureReference
+    /// Writes the current in-memory reconstruction state (baseline + any edit/annotations) back
+    /// into `session`, if one exists — called after a fresh "Generate" succeeds, and again every
+    /// time the coach drags a joint or marks up the view. No-ops silently if there's no session to
+    /// save into (see `session`'s doc comment).
+    private func upsertReconstruction() {
+        guard let session, let sessionStore else { return }
+        let entry = ReconstructionEntry(
+            timestampSeconds: entryTimestamp,
+            worldPositions: entryBaseWorldPositions,
+            jointOverrides: lastJointOverrides,
+            leftGrip: leftGrip,
+            rightGrip: rightGrip,
+            leftFoot: leftFoot,
+            rightFoot: rightFoot,
+            leftGripOffsetSeconds: leftGripOffsetSeconds,
+            rightGripOffsetSeconds: rightGripOffsetSeconds,
+            leftFootOffsetSeconds: leftFootOffsetSeconds,
+            rightFootOffsetSeconds: rightFootOffsetSeconds,
+            annotationStrokes: lastAnnotationStrokes
         )
-        leftGrip = mainClassification.leftHand
-        rightGrip = mainClassification.rightHand
-        leftFoot = mainClassification.leftFoot
-        rightFoot = mainClassification.rightFoot
-        leftGripOffsetSeconds = nil
-        rightGripOffsetSeconds = nil
-        leftFootOffsetSeconds = nil
-        rightFootOffsetSeconds = nil
+        session.upsertReconstruction(entry)
+        sessionStore.save()
+    }
 
-        func meets(_ c: GripClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
-        func meetsFoot(_ c: FootClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
+    private func generate() {
+        entryTimestamp = input.pausedSeconds
 
-        // Same idea as the raw-hand nearby-frame fallback this replaces: a fully gripped/wedged
-        // limb is close to worst-case for classification on the EXACT paused frame, so if any
-        // slot came back low-confidence, search nearby moments in the same clip (the reach just
-        // before contact, or the release just after, are the usual candidates) for a more
-        // confident answer for THAT specific limb. Each candidate frame is analyzed (body pose +
-        // hands) ONCE and reused across all four slots, rather than re-running Vision per slot —
-        // capped at 8 candidates to bound how many extra Vision calls one "Generate" tap can
-        // trigger.
-        if !meets(leftGrip) || !meets(rightGrip) || !meetsFoot(leftFoot) || !meetsFoot(rightFoot) {
-            let candidates = Array(input.frameStore.nearbyFrames(toPlaybackSeconds: input.pausedSeconds, withinSeconds: 1.5).prefix(8))
-            for candidate in candidates {
-                guard let candidateDepthContext = candidate.depthGroundingContext,
-                      let candidatePose = try? BodyPose3DExtractor.detect(in: candidate.capturedImage, deviceOrientation: candidate.deviceOrientation)
-                else { continue }
-                let candidateHands = BodyPose3DExtractor.detectHands(in: candidate.capturedImage, context: candidateDepthContext)
-                let candidateClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-                    poseSample: candidatePose,
-                    cameraTransform: candidate.cameraTransform,
-                    depthContext: candidateDepthContext,
-                    handSample: candidateHands,
-                    handCameraTransform: candidate.cameraTransform,
-                    wallReference: arManager.wallTextureReference
-                )
-                let offset = candidate.timestamp - frameData.timestamp
+        // A reconstruction already exists for (near enough) this exact paused moment — load it
+        // directly rather than re-running Vision. This is a "load," not a "regenerate": see
+        // `RecordingSession.swift`'s `ReconstructionEntry` doc comment for why a NEW reconstruction
+        // at a previously-unanalyzed timestamp isn't possible after the live AR session ends, but
+        // that's not what's happening here since a saved entry for this exact spot already exists.
+        if let session, let existing = session.reconstructions.first(where: { abs($0.timestampSeconds - input.pausedSeconds) <= 0.3 }) {
+            entryTimestamp = existing.timestampSeconds
+            entryBaseWorldPositions = existing.worldPositions
+            initialWorldPositions = existing.worldPositions
+            initialJointOverrides = existing.jointOverrides
+            lastJointOverrides = existing.jointOverrides
+            initialAnnotationStrokes = existing.annotationStrokes
+            lastAnnotationStrokes = existing.annotationStrokes
+            leftGrip = existing.leftGrip
+            rightGrip = existing.rightGrip
+            leftFoot = existing.leftFoot
+            rightFoot = existing.rightFoot
+            leftGripOffsetSeconds = existing.leftGripOffsetSeconds
+            rightGripOffsetSeconds = existing.rightGripOffsetSeconds
+            leftFootOffsetSeconds = existing.leftFootOffsetSeconds
+            rightFootOffsetSeconds = existing.rightFootOffsetSeconds
+            loadedFromSavedEntry = true
+            isReady = true
+            DebugLog.reconstruction.info("Loaded saved reconstruction for t=\(existing.timestampSeconds, privacy: .public)s — skipping Vision")
+            return
+        }
 
-                if !meets(leftGrip), meets(candidateClassification.leftHand) {
-                    leftGrip = candidateClassification.leftHand
-                    leftGripOffsetSeconds = offset
-                }
-                if !meets(rightGrip), meets(candidateClassification.rightHand) {
-                    rightGrip = candidateClassification.rightHand
-                    rightGripOffsetSeconds = offset
-                }
-                if !meetsFoot(leftFoot), meetsFoot(candidateClassification.leftFoot) {
-                    leftFoot = candidateClassification.leftFoot
-                    leftFootOffsetSeconds = offset
-                }
-                if !meetsFoot(rightFoot), meetsFoot(candidateClassification.rightFoot) {
-                    rightFoot = candidateClassification.rightFoot
-                    rightFootOffsetSeconds = offset
-                }
+        // The actual detection/grounding/classification algorithm lives in
+        // `LiveReconstructionGenerator` (Core/PoseReconstruction) — this just wires this screen's
+        // input/state to it and copies the result back out. See that type's doc comment for why it
+        // was pulled out of here.
+        do {
+            let result = try LiveReconstructionGenerator.generate(input: input, wallReference: arManager.wallTextureReference)
+            cameraTransform = result.cameraTransform
+            // Separate from `cameraTransform` above (which stays non-optional and feeds
+            // classification math) — this is specifically "do we have a REAL per-frame recording
+            // transform to seed the 3D-view camera with," passed straight through to
+            // `ReconstructionView`. Only ever set here, on the fresh-detection path — stays nil for
+            // a loaded saved entry (see the early return above) or if generation threw, neither of
+            // which has a trustworthy per-frame camera pose to seed a camera from.
+            recordingCameraTransform = result.cameraTransform
+            depthContext = result.depthContext
+            poseSample = result.poseSample
+            poseError = result.poseError
+            leftGrip = result.leftGrip
+            rightGrip = result.rightGrip
+            leftFoot = result.leftFoot
+            rightFoot = result.rightFoot
+            leftGripOffsetSeconds = result.leftGripOffsetSeconds
+            rightGripOffsetSeconds = result.rightGripOffsetSeconds
+            leftFootOffsetSeconds = result.leftFootOffsetSeconds
+            rightFootOffsetSeconds = result.rightFootOffsetSeconds
+
+            if let worldPositions = result.worldPositions {
+                // Freshly generated (not loaded) — save it right away, per feedback item #2's
+                // "indicator in specific frame if that's already 3d generated": this is the moment
+                // a scrubber tick mark should appear for this timestamp. `entryBaseWorldPositions`
+                // is the baseline every later edit/annotation upsert writes on top of (see
+                // `upsertReconstruction()`).
+                entryBaseWorldPositions = worldPositions
+                upsertReconstruction()
             }
+        } catch LiveReconstructionGenerator.GenerationError.noStoredFrameData {
+            poseError = "No stored depth/camera data for this moment in the video."
+        } catch LiveReconstructionGenerator.GenerationError.couldNotReadFrame {
+            poseError = "Couldn't read this frame from the recording — try a different moment in the video."
+        } catch {
+            poseError = "Something went wrong generating this reconstruction — try a different moment in the video."
+            let description = String(describing: error)
+            DebugLog.reconstruction.error("LiveReconstructionGenerator.generate threw an unexpected error: \(description, privacy: .public)")
         }
 
         isReady = true

@@ -4,10 +4,43 @@ import simd
 import UIKit
 import CoreImage
 
+/// POSE-RECONSTRUCTION MODULE (the app's "core function"): everything in `Core/PoseReconstruction/`
+/// is the actual climbing-analysis algorithm — Vision body/hand detection, LiDAR grounding,
+/// grip/foot classification, manual-pose-edit constraints, and turning all of that into renderable
+/// RealityKit geometry. Nothing in this folder is SwiftUI; it takes plain data in (joint samples,
+/// camera transforms, depth buffers) and hands plain data or RealityKit entities back out.
+///
+/// This is deliberately named differently from `Features/Reconstruction/` (the Step 4 SCREEN,
+/// which only contains the SwiftUI view code) so the two are never confused in Xcode's navigator —
+/// a frontend dev builds screens against this module's outputs; a backend dev changes how those
+/// outputs are computed. `ReconstructionEntityBuilder` and `BodyPose3DExtractor` are this module's
+/// two main entry points — most callers only ever need those two, not the smaller helper files.
+///
 /// Builds RealityKit entities for the Step 4 static reconstruction: the previously-scanned wall
 /// mesh, and a single frame's body-pose skeleton, both placed in the SAME ARKit world coordinate
 /// space they were captured in (both come from the one shared ARSession — see ARSessionManager).
 enum ReconstructionEntityBuilder {
+
+    // MARK: - Joint entity naming
+
+    /// Every rendered joint sphere (see `skeletonEntity` below) is named `"joint.<rawValue>"` so
+    /// `ReconstructionSceneView.Coordinator`'s Edit Pose drag gesture can hit-test `ARView.entity
+    /// (at:)`'s result back to a `BodyJointName` — this is the one place both the writer (here) and
+    /// the reader (`Coordinator.jointHit`) agree on that naming convention, so it's never duplicated
+    /// as a raw string literal in the SwiftUI-side gesture code.
+    private static let jointEntityNamePrefix = "joint."
+
+    private static func jointEntityName(for joint: BodyJointName) -> String {
+        jointEntityNamePrefix + joint.rawValue
+    }
+
+    /// Parses an `Entity.name` produced by `jointEntityName(for:)` back into a `BodyJointName` —
+    /// nil for any entity that isn't a joint sphere (the wall, bones, hand/foot presets, etc. all
+    /// have different names).
+    static func jointName(fromEntityName entityName: String) -> BodyJointName? {
+        guard entityName.hasPrefix(jointEntityNamePrefix) else { return nil }
+        return BodyJointName(rawValue: String(entityName.dropFirst(jointEntityNamePrefix.count)))
+    }
 
     // MARK: - Wall mesh
 
@@ -62,6 +95,72 @@ enum ReconstructionEntityBuilder {
         }
         DebugLog.reconstruction.info("Wall entity built from \(anchors.count, privacy: .public) coarse mesh anchors (fallback — no usable depth grid), textured=\(texturedMaterial != nil, privacy: .public)")
         return root
+    }
+
+    // MARK: - Camera framing
+
+    /// Straight-ahead distance (meters) from the camera to whatever the depth sensor saw directly
+    /// in front of it for THIS frame — read from the center of the depth grid. Used ONLY to seed
+    /// the initial 3D-view camera's zoom/angle (see `ReconstructionSceneView`'s camera setup), not
+    /// for joint placement, so this deliberately skips the confidence filtering/hole-fill
+    /// `BodyPose3DExtractor` uses for joints — a rough distance is enough to get the starting
+    /// zoom/angle in the right ballpark, and precision matters far more for joints than for where
+    /// the orbit camera starts out.
+    static func centerDepthMeters(from context: BodyPose3DExtractor.DepthGroundingContext) -> Float? {
+        let depthMap = context.depthMap
+        let width = CVPixelBufferGetWidth(depthMap)
+        let height = CVPixelBufferGetHeight(depthMap)
+        guard width > 0, height > 0 else { return nil }
+        CVPixelBufferLockBaseAddress(depthMap, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(depthMap, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(depthMap) else { return nil }
+        let bytesPerRow = CVPixelBufferGetBytesPerRow(depthMap)
+        let x = width / 2
+        let y = height / 2
+        let value = (base + y * bytesPerRow).assumingMemoryBound(to: Float32.self)[x]
+        guard value.isFinite, value > 0 else { return nil }
+        return value
+    }
+
+    /// Approximates "what point on the scanned wall mesh was the camera looking at" by searching
+    /// every mesh vertex for the one closest to the ray cast forward from `origin`, restricted to
+    /// a cone roughly matching a phone camera's field of view (so a stray vertex far off to the
+    /// side can't win just for being close to the ray's *line* while nowhere near where the camera
+    /// actually pointed). Fallback for camera framing when there's no per-frame depth map to
+    /// sample directly (see `centerDepthMeters`) but the coarse `ARMeshAnchor` scan is available —
+    /// e.g. an approximate/estimated reconstruction with no live depth.
+    ///
+    /// Ported from the CH5_Lidar_Testing sibling project's `MeshEntityBuilder.surfacePoint`, which
+    /// validated this exact technique on device for matching the initial 3D-view camera to the
+    /// real recording distance/angle — adapted here to read straight from `ARMeshAnchor.geometry`
+    /// instead of that project's own `MeshArchive` vertex cache.
+    static func surfacePoint(nearRayFrom origin: SIMD3<Float>, direction: SIMD3<Float>, in anchors: [ARMeshAnchor], maxAngleDegrees: Float = 30) -> SIMD3<Float>? {
+        let length = simd_length(direction)
+        guard length > 0.0001 else { return nil }
+        let dir = direction / length
+        let maxTan = tan(maxAngleDegrees * .pi / 180)
+
+        var best: (point: SIMD3<Float>, perpDist: Float)?
+        for anchor in anchors {
+            let vertexSource = anchor.geometry.vertices
+            let vertexPointer = vertexSource.buffer.contents()
+            for i in 0..<vertexSource.count {
+                let offset = vertexSource.offset + vertexSource.stride * i
+                let local = (vertexPointer + offset).assumingMemoryBound(to: SIMD3<Float>.self).pointee
+                let world4 = anchor.transform * SIMD4<Float>(local, 1)
+                let world = SIMD3<Float>(world4.x, world4.y, world4.z)
+                let toVertex = world - origin
+                let t = simd_dot(toVertex, dir)
+                guard t > 0.05 else { continue } // behind/at the camera
+                let perp = toVertex - dir * t
+                let perpDist = simd_length(perp)
+                guard perpDist <= t * maxTan else { continue } // outside the view cone
+                if best == nil || perpDist < best!.perpDist {
+                    best = (world, perpDist)
+                }
+            }
+        }
+        return best?.point
     }
 
     /// Builds the wall as a dense heightfield mesh triangulated directly from the reference
@@ -195,7 +294,12 @@ enum ReconstructionEntityBuilder {
                 guard let point = worldPoints[index] else { continue }
                 vertexIndex[index] = positions.count
                 positions.append(point)
-                uvs.append(SIMD2<Float>((Float(x) + 0.5) / Float(depthWidth), (Float(y) + 0.5) / Float(depthHeight)))
+                // V flipped (`1 - ...`): RealityKit's texture V origin doesn't match the depth
+                // grid's row order (y=0 = top row) 1:1, so leaving this unflipped renders the wall
+                // photo mirrored top-to-bottom vs. how it actually looks in person — confirmed and
+                // fixed the same way in the LidarCalibTest sibling project's MeshEntityBuilder.
+                let normalizedV = (Float(y) + 0.5) / Float(depthHeight)
+                uvs.append(SIMD2<Float>((Float(x) + 0.5) / Float(depthWidth), 1 - normalizedV))
             }
         }
 
@@ -328,11 +432,13 @@ enum ReconstructionEntityBuilder {
     /// that are behind/outside the reference camera's view — those will just sample a
     /// wrong-but-bounded pixel rather than needing special-case handling in the mesh descriptor.
     ///
-    /// UNVERIFIED ON DEVICE — two specific things to check visually once this runs:
-    /// 1. The ARKit-camera-space -> pixel-projection conversion (Y and Z negation) mirrors the
-    ///    same one in `BodyPose3DExtractor.lidarScaleCorrection`, which itself is unverified.
-    /// 2. Texture V-orientation: if the wall photo appears upside-down, change the `v` line
-    ///    below to `1 - (v / height)`.
+    /// V is flipped below (`1 - ...`) to match the same fix applied to `pointCloudWallEntity`'s UV
+    /// computation — confirmed and fixed in the LidarCalibTest sibling project (the wall photo
+    /// rendered mirrored top-to-bottom without it).
+    ///
+    /// UNVERIFIED ON DEVICE: the ARKit-camera-space -> pixel-projection conversion (Y and Z
+    /// negation) mirrors the same one in `BodyPose3DExtractor.lidarScaleCorrection`, which itself
+    /// is unverified.
     private static func projectToUV(worldPosition: SIMD3<Float>, reference: ARSessionManager.WallTextureReference) -> SIMD2<Float> {
         // cameraTransform is camera-to-world; invert to go world -> reference camera space.
         let cameraSpace4 = reference.cameraTransform.inverse * SIMD4<Float>(worldPosition, 1)
@@ -352,7 +458,9 @@ enum ReconstructionEntityBuilder {
 
         let u = fx * xCV / safeZ + cx
         let v = fy * yCV / safeZ + cy
-        return SIMD2<Float>(min(max(u / width, 0), 1), min(max(v / height, 0), 1))
+        let normalizedU = min(max(u / width, 0), 1)
+        let normalizedV = min(max(v / height, 0), 1)
+        return SIMD2<Float>(normalizedU, 1 - normalizedV)
     }
 
     // MARK: - Skeleton
@@ -362,12 +470,14 @@ enum ReconstructionEntityBuilder {
     /// same positions without recomputing them.
     ///
     /// When `depthContext` is available (the recorded frame had real LiDAR depth), every joint
-    /// is grounded in that real depth via `BodyPose3DExtractor.groundAllJoints` — this is what
-    /// fixes both the climber-height accuracy and the skeleton-vs-wall placement (the wall mesh
-    /// is built from the SAME depth data, so grounding the skeleton in it puts both in a
-    /// consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
-    /// depth guess). Falls back to the ungrounded, Vision-only estimate for ALL joints (never a
-    /// partial mix) if grounding isn't available or fails for this frame.
+    /// that CAN be grounded in that real depth is, via `BodyPose3DExtractor.groundJointsBestEffort`
+    /// — this is what fixes both the climber-height accuracy and the skeleton-vs-wall placement
+    /// (the wall mesh is built from the SAME depth data, so grounding the skeleton in it puts both
+    /// in a consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
+    /// depth guess). Only the specific joint(s) that fail to ground (e.g. an occluded hand) fall
+    /// back to Vision's own estimate — see `groundJointsBestEffort`'s doc comment for why an
+    /// all-or-nothing per-frame result would be worse. Falls back to the ungrounded, Vision-only
+    /// estimate for every joint only when there's no depth data for this frame at all.
     ///
     /// `wallReference`, when available, is used as a final sanity pass (`keepInFrontOfWall`) —
     /// the wall's point-cloud mesh and the skeleton are grounded from DIFFERENT frames (Step 1's
@@ -380,32 +490,38 @@ enum ReconstructionEntityBuilder {
         depthContext: BodyPose3DExtractor.DepthGroundingContext? = nil,
         wallReference: ARSessionManager.WallTextureReference? = nil
     ) -> [BodyJointName: SIMD3<Float>] {
-        if let depthContext,
-           let grounded = BodyPose3DExtractor.groundAllJoints(
-               sample.rootRelativePositions,
-               cameraOriginMatrix: sample.cameraOriginMatrix,
-               context: depthContext
-           ) {
-            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth")
+        guard let depthContext else {
+            DebugLog.reconstruction.info("Step 4 skeleton placed using Vision-only estimate (no depth data for this frame)")
             var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
-            for (joint, cameraSpace) in grounded {
-                worldPositions[joint] = BodyPose3DExtractor.worldPosition(cameraSpace: cameraSpace, cameraTransform: cameraTransform)
+            for (joint, local) in sample.rootRelativePositions {
+                worldPositions[joint] = BodyPose3DExtractor.worldPosition(
+                    rootRelative: local,
+                    cameraOriginMatrix: sample.cameraOriginMatrix,
+                    cameraTransform: cameraTransform
+                )
             }
             return keepInFrontOfWall(worldPositions, wallReference: wallReference)
         }
 
-        if depthContext != nil {
-            DebugLog.reconstruction.error("Step 4 had depth data but LiDAR grounding failed for this frame — falling back to Vision-only placement")
+        // Best-effort, not all-or-nothing: keep real LiDAR grounding for every joint that succeeds,
+        // and only fall back to Vision's own (less accurate) estimate for whichever SPECIFIC
+        // joint(s) fail — see `groundJointsBestEffort`'s doc comment for why throwing away every
+        // other joint's real depth over one bad reading (e.g. a hand's confidence-dropout search
+        // grabbing the wall behind it) was making the WHOLE skeleton visibly worse than necessary.
+        let (grounded, ungroundedJoints) = BodyPose3DExtractor.groundJointsBestEffort(
+            sample.rootRelativePositions,
+            cameraOriginMatrix: sample.cameraOriginMatrix,
+            context: depthContext
+        )
+        if ungroundedJoints.isEmpty {
+            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (17/17 joints)")
         } else {
-            DebugLog.reconstruction.info("Step 4 skeleton placed using Vision-only estimate (no depth data for this frame)")
+            let resolved = sample.rootRelativePositions.count - ungroundedJoints.count
+            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (\(resolved)/\(sample.rootRelativePositions.count) joints — the rest used Vision-only, see prior warning for which)")
         }
         var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
-        for (joint, local) in sample.rootRelativePositions {
-            worldPositions[joint] = BodyPose3DExtractor.worldPosition(
-                rootRelative: local,
-                cameraOriginMatrix: sample.cameraOriginMatrix,
-                cameraTransform: cameraTransform
-            )
+        for (joint, cameraSpace) in grounded {
+            worldPositions[joint] = BodyPose3DExtractor.worldPosition(cameraSpace: cameraSpace, cameraTransform: cameraTransform)
         }
         return keepInFrontOfWall(worldPositions, wallReference: wallReference)
     }
@@ -512,14 +628,34 @@ enum ReconstructionEntityBuilder {
     }
 
     static func skeletonEntity(
-        from sample: BodyPoseSample,
+        /// Optional (unlike `worldJointPositions`'s required `sample`) so a saved session review
+        /// can render a previously-generated reconstruction via `overridePositions` alone, without
+        /// re-running Vision — see `RecordingSession`/`ReconstructionEntry`'s doc comments for why
+        /// that data can't be regenerated after the fact. Only actually read when
+        /// `overridePositions` is nil; `??`'s right side is lazily evaluated, so passing nil here
+        /// is safe as long as `overridePositions` is provided.
+        from sample: BodyPoseSample?,
         cameraTransform: simd_float4x4,
         depthContext: BodyPose3DExtractor.DepthGroundingContext? = nil,
         wallReference: ARSessionManager.WallTextureReference? = nil,
         leftGrip: GripClassification? = nil,
         rightGrip: GripClassification? = nil,
         leftFoot: FootClassification? = nil,
-        rightFoot: FootClassification? = nil
+        rightFoot: FootClassification? = nil,
+        /// When present, used INSTEAD of the auto-detected/grounded positions below — the coach's
+        /// manually-dragged pose (see `SkeletonPoseEditor`). Passing nil (the default) preserves
+        /// the original auto-only behavior exactly.
+        overridePositions: [BodyJointName: SIMD3<Float>]? = nil,
+        /// Joints/bones about to be affected by an in-progress drag (see
+        /// `SkeletonPoseEditor.impactedJoints`/`impactedBones`) — rendered in a distinct highlight
+        /// color so the coach can see what will move BEFORE releasing the drag, not just after.
+        highlightedJoints: Set<BodyJointName> = [],
+        highlightedBones: Set<SkeletonBone> = [],
+        /// True while the coach is in pose-editing mode — skips the mannequin body wrapper so the
+        /// bare yellow joints/red bones are fully exposed and easy to grab, instead of being
+        /// partly buried inside the (visually larger) mannequin capsules. Hand/foot presets still
+        /// render, since those attach at the wrist/ankle rather than needing to be tapped directly.
+        hideMannequinBody: Bool = false
     ) -> Entity {
         let root = Entity()
         // Unlit (not affected by scene lighting) and bright, so the climber's body stays clearly
@@ -527,43 +663,64 @@ enum ReconstructionEntityBuilder {
         // coach is actually here to look at.
         let jointMaterial = UnlitMaterial(color: .systemYellow)
         let boneMaterial = UnlitMaterial(color: .systemRed)
+        // Distinct from every other color already in use (yellow joints, red bones, teal preset
+        // grips/feet, tan mannequin) so "this is about to move" reads unambiguously during a drag.
+        let highlightJointMaterial = UnlitMaterial(color: .systemGreen)
+        let highlightBoneMaterial = UnlitMaterial(color: .systemGreen)
         var mannequinMaterial = SimpleMaterial(color: UIColor(red: 0.86, green: 0.71, blue: 0.6, alpha: 0.92), roughness: 0.7, isMetallic: false)
         mannequinMaterial.faceCulling = .none
 
-        let worldPositions = worldJointPositions(from: sample, cameraTransform: cameraTransform, depthContext: depthContext, wallReference: wallReference)
+        let worldPositions = overridePositions ?? sample.map {
+            worldJointPositions(from: $0, cameraTransform: cameraTransform, depthContext: depthContext, wallReference: wallReference)
+        } ?? [:]
 
         // Mannequin body: a rough capsule "wrapper" around each bone, sized per body part, so the
         // coach sees an actual humanoid volume instead of a bare stick figure. Purely a visual
         // approximation — capsule radii are fixed anatomical guesses, NOT measured from this
         // specific climber (Step 2 calibration's segment LENGTHS already flow into joint spacing;
-        // there's no equivalent measured girth/thickness to draw on).
-        for bone in skeletonBones {
-            guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
-            if let capsule = capsuleBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
-                root.addChild(capsule)
+        // there's no equivalent measured girth/thickness to draw on). Skipped in pose-editing mode
+        // — see `hideMannequinBody`'s doc comment.
+        if !hideMannequinBody {
+            for bone in skeletonBones {
+                guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
+                if let capsule = capsuleBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
+                    root.addChild(capsule)
+                }
             }
-        }
-        // Cover the flat cylinder end caps at each joint with a sphere sized to the thickest
-        // connected limb, so the mannequin reads as one continuous body instead of a set of
-        // separate rod segments meeting at visible seams.
-        for joint in worldPositions.keys {
-            guard let position = worldPositions[joint] else { continue }
-            let radius = mannequinJointRadius(at: joint)
-            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [mannequinMaterial])
-            sphere.position = position
-            root.addChild(sphere)
+            // Cover the flat cylinder end caps at each joint with a sphere sized to the thickest
+            // connected limb, so the mannequin reads as one continuous body instead of a set of
+            // separate rod segments meeting at visible seams.
+            for joint in worldPositions.keys {
+                guard let position = worldPositions[joint] else { continue }
+                let radius = mannequinJointRadius(at: joint)
+                let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [mannequinMaterial])
+                sphere.position = position
+                root.addChild(sphere)
+            }
         }
 
         for (joint, position) in worldPositions {
-            let sphere = ModelEntity(mesh: .generateSphere(radius: 0.035), materials: [jointMaterial])
+            let isHighlighted = highlightedJoints.contains(joint)
+            // Slightly larger when highlighted — both a clearer visual cue and a bigger hit
+            // target for the joint that's actively being dragged.
+            let radius: Float = isHighlighted ? 0.045 : 0.035
+            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [isHighlighted ? highlightJointMaterial : jointMaterial])
             sphere.position = position
-            sphere.name = "joint.\(joint.rawValue)"
+            sphere.name = jointEntityName(for: joint)
+            // REQUIRED for `ARView.entity(at:)` (used by the Edit Pose drag gesture) to ever hit
+            // this sphere at all — RealityKit's hit-testing only considers entities with a
+            // collision shape, never bare render geometry. Without this, every tap-and-drag on a
+            // joint silently misses and falls through to the ordinary camera-orbit gesture, which
+            // looks exactly like "dragging a joint just rotates the camera instead."
+            sphere.generateCollisionShapes(recursive: false)
             root.addChild(sphere)
         }
 
         for bone in skeletonBones {
             guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
-            if let boneEntity = cylinderBetween(a, b, radius: 0.016, material: boneMaterial) {
+            let isHighlighted = highlightedBones.contains(bone)
+            let radius: Float = isHighlighted ? 0.022 : 0.016
+            if let boneEntity = cylinderBetween(a, b, radius: radius, material: isHighlighted ? highlightBoneMaterial : boneMaterial) {
                 root.addChild(boneEntity)
             }
         }
