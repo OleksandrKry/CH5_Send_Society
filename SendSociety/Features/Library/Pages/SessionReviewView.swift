@@ -200,6 +200,10 @@ struct SessionReviewView: View {
         // MUST be the orientation the phone was actually held in during this recording, not a
         // fixed assumption — see `ReconstructionEstimator.estimate`'s doc comment for why.
         let deviceOrientation = UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
+        // The climber's Step 2 measured height (nil if Step 2 was skipped) — this path has NO
+        // real depth at all, so it's the most likely to need this correction. See
+        // `CalibrationScaleCorrection`'s doc comment.
+        let calibratedHeightMeters = session.calibration?.segments.height
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -207,7 +211,8 @@ struct SessionReviewView: View {
                     videoURL: url,
                     atSeconds: timestamp,
                     deviceOrientation: deviceOrientation,
-                    wallReference: reference
+                    wallReference: reference,
+                    calibratedHeightMeters: calibratedHeightMeters
                 )
                 DispatchQueue.main.async {
                     session.upsertReconstruction(entry)

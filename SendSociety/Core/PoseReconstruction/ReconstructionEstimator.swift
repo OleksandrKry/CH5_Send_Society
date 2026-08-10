@@ -42,7 +42,8 @@ enum ReconstructionEstimator {
         videoURL: URL,
         atSeconds timestamp: Double,
         deviceOrientation: UIDeviceOrientation,
-        wallReference: ARSessionManager.WallTextureReference?
+        wallReference: ARSessionManager.WallTextureReference?,
+        calibratedHeightMeters: Float? = nil
     ) throws -> ReconstructionEntry {
         guard let cgImage = VideoFrameExtractor.extractFrame(from: videoURL, atSeconds: timestamp) else {
             throw EstimationError.couldNotReadFrame
@@ -73,12 +74,17 @@ enum ReconstructionEstimator {
             // a frame with the climber in it -> "Estimate 3D View".
             let estimateInitialRotation = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
             let approximateCameraTransform = (wallReference?.cameraTransform ?? matrix_identity_float4x4) * estimateInitialRotation
-            let worldPositions = ReconstructionEntityBuilder.worldJointPositions(
+            let rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
                 from: poseSample,
                 cameraTransform: approximateCameraTransform,
                 depthContext: nil,
                 wallReference: wallReference
             )
+            // This path has NO real depth at all (see this type's doc comment), so it's the most
+            // likely of the two generation paths to come out the wrong size — see
+            // `CalibrationScaleCorrection`'s doc comment. No-ops when `calibratedHeightMeters` is
+            // nil (Step 2 was skipped for this session) or the heights already agree.
+            let worldPositions = CalibrationScaleCorrection.rescaled(rawWorldPositions, toMatchCalibratedHeightMeters: calibratedHeightMeters)
             // Hand classification needs real depth-grounded hand joints (`handSample: nil` here),
             // so both hands always come back nil -> rendered as an honest "uncertain" marker. Foot
             // classification only needs body-joint geometry, so it still runs.

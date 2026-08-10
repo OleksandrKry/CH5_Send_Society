@@ -22,6 +22,7 @@
 		9CDFDA505944DE50835DC61A /* CalibrationFrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */; };
 		B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */; };
 		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
+		7BBD03063E725D612CDFECC5 /* CalibrationScaleCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */; };
 		9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */; };
 		A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2167F61F9A0468293617CE7 /* PlaybackView.swift */; };
 		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
@@ -84,6 +85,7 @@
 		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
 		0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationHeightCorrection.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
+		A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationScaleCorrection.swift; sourceTree = "<group>"; };
 		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
 		C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPoseLibrary.swift; sourceTree = "<group>"; };
 		F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonPoseEditor.swift; sourceTree = "<group>"; };
@@ -286,6 +288,7 @@
 				4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */,
 				0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */,
 				901F77D623A462E5F44D0125 /* JointDragProjector.swift */,
+				A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */,
 			);
 			path = PoseReconstruction;
 			sourceTree = "<group>";
@@ -432,6 +435,7 @@
 				9CDFDA505944DE50835DC61A /* CalibrationFrameProcessor.swift in Sources */,
 				B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */,
 				346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */,
+				7BBD03063E725D612CDFECC5 /* CalibrationScaleCorrection.swift in Sources */,
 				F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */,
 				742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */,
 				A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */,
