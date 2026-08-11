@@ -43,7 +43,7 @@ enum ReconstructionEstimator {
         atSeconds timestamp: Double,
         deviceOrientation: UIDeviceOrientation,
         wallReference: ARSessionManager.WallTextureReference?,
-        calibratedHeightMeters: Float? = nil
+        calibratedSegments: SegmentLengths? = nil
     ) throws -> ReconstructionEntry {
         guard let cgImage = VideoFrameExtractor.extractFrame(from: videoURL, atSeconds: timestamp) else {
             throw EstimationError.couldNotReadFrame
@@ -81,10 +81,10 @@ enum ReconstructionEstimator {
                 wallReference: wallReference
             )
             // This path has NO real depth at all (see this type's doc comment), so it's the most
-            // likely of the two generation paths to come out the wrong size — see
-            // `CalibrationScaleCorrection`'s doc comment. No-ops when `calibratedHeightMeters` is
-            // nil (Step 2 was skipped for this session) or the heights already agree.
-            let worldPositions = CalibrationScaleCorrection.rescaled(rawWorldPositions, toMatchCalibratedHeightMeters: calibratedHeightMeters)
+            // likely of the two generation paths to have bone-proportion errors — see
+            // `CalibrationScaleCorrection`'s doc comment. No-ops when `calibratedSegments` is nil
+            // (Step 2 was skipped for this session).
+            let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
             // Hand classification needs real depth-grounded hand joints (`handSample: nil` here),
             // so both hands always come back nil -> rendered as an honest "uncertain" marker. Foot
             // classification only needs body-joint geometry, so it still runs.

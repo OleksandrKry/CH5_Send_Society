@@ -62,7 +62,7 @@ enum LiveReconstructionGenerator {
     static func generate(
         input: ReconstructionInput,
         wallReference: ARSessionManager.WallTextureReference?,
-        calibratedHeightMeters: Float? = nil
+        calibratedSegments: SegmentLengths? = nil
     ) throws -> Result {
         guard let frameData = input.frameStore.nearestFrame(toPlaybackSeconds: input.pausedSeconds) else {
             let seconds = input.pausedSeconds
@@ -209,11 +209,11 @@ enum LiveReconstructionGenerator {
             depthContext: depthContext,
             wallReference: wallReference
         )
-        // Corrects this frame's detected scale against the climber's Step 2 measurement, if one
-        // exists — see `CalibrationScaleCorrection`'s doc comment for why this frame's own
-        // detection has no other way to know its scale is off. No-ops when `calibratedHeightMeters`
-        // is nil (Step 2 was skipped) or the detected/calibrated heights already agree.
-        let worldPositions = CalibrationScaleCorrection.rescaled(rawWorldPositions, toMatchCalibratedHeightMeters: calibratedHeightMeters)
+        // Corrects each bone's length against the climber's Step 2 measurement, if one exists —
+        // see `CalibrationScaleCorrection`'s doc comment for why this frame's own detection has no
+        // other way to know an individual limb's proportions are off. No-ops when
+        // `calibratedSegments` is nil (Step 2 was skipped).
+        let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
 
         return Result(
             cameraTransform: cameraTransform,

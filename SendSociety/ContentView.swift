@@ -320,13 +320,13 @@ private struct ReconstructionHost: View {
         // input/state to it and copies the result back out. See that type's doc comment for why it
         // was pulled out of here.
         do {
-            // `session?.calibration?.segments.height` is the climber's Step 2 measured height
+            // `session?.calibration?.segments` are the climber's Step 2 measured limb lengths
             // (nil if Step 2 was skipped) — see `CalibrationScaleCorrection`'s doc comment for why
-            // this frame's own detection needs it to correct its scale.
+            // this frame's own detection needs them to correct its bone proportions.
             let result = try LiveReconstructionGenerator.generate(
                 input: input,
                 wallReference: arManager.wallTextureReference,
-                calibratedHeightMeters: session?.calibration?.segments.height
+                calibratedSegments: session?.calibration?.segments
             )
             cameraTransform = result.cameraTransform
             // Separate from `cameraTransform` above (which stays non-optional and feeds
