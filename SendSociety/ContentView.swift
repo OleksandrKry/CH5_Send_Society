@@ -355,6 +355,13 @@ private struct ReconstructionHost: View {
                 // is the baseline every later edit/annotation upsert writes on top of (see
                 // `upsertReconstruction()`).
                 entryBaseWorldPositions = worldPositions
+                // Render from these FINAL, calibration-retargeted positions directly, matching the
+                // loaded-saved-entry path above (`initialWorldPositions = existing.worldPositions`).
+                // The old behavior left this unset here, so `ReconstructionView` fell back to
+                // re-deriving positions from `poseSample` — which skips retargeting, and for a
+                // YOLO-generated result is impossible outright since `poseSample` is always nil
+                // there. See `LiveReconstructionGenerator.Result.worldPositions`'s doc comment.
+                initialWorldPositions = worldPositions
                 upsertReconstruction()
             }
         } catch LiveReconstructionGenerator.GenerationError.noStoredFrameData {

@@ -13,6 +13,17 @@ import simd
 /// developer editing `SessionReviewView`'s layout never needs to see or understand this; a backend
 /// developer changing how estimation works never needs to touch SwiftUI.
 ///
+/// HYBRID BACKEND, ALWAYS ON (unlike Step 2/Step 4, this is NOT gated by `PoseDetectionSettings
+/// .useYOLO` — see that switch's doc comment): with no LiDAR depth map available at all here,
+/// Vision's own 3D pose request is the only depth signal there is, so it always runs and always
+/// supplies per-joint depth (`BodyPose3DExtractor.visionEstimatedDepths`). YOLO, when it also
+/// detects a person in the same frame and a wall reference (for intrinsics) is available, supplies
+/// the actual 2D joint positions those depths get unprojected against — per explicit product
+/// decision, YOLO's 2D bone detection is trusted over Vision's own. If YOLO finds nobody, or there's
+/// no wall reference to get intrinsics from, this falls back to Vision's positions AND depth (the
+/// original, pre-YOLO behavior) for that one frame — never a hard failure just because the hybrid
+/// half of the combination didn't come together.
+///
 /// See `ReconstructionEntry.isApproximate`'s doc comment for the full accuracy trade-off this
 /// implies versus a live-generated (real LiDAR depth) reconstruction.
 enum ReconstructionEstimator {
@@ -74,12 +85,41 @@ enum ReconstructionEstimator {
             // a frame with the climber in it -> "Estimate 3D View".
             let estimateInitialRotation = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
             let approximateCameraTransform = (wallReference?.cameraTransform ?? matrix_identity_float4x4) * estimateInitialRotation
-            let rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
-                from: poseSample,
-                cameraTransform: approximateCameraTransform,
-                depthContext: nil,
-                wallReference: wallReference
-            )
+
+            // HYBRID: YOLO's 2D joint positions + Vision's own per-joint depth — see this type's
+            // doc comment for the full rationale and fallback behavior. Vision's depth is needed
+            // either way, so it's computed unconditionally; YOLO is attempted best-effort on top.
+            let visionDepths = BodyPose3DExtractor.visionEstimatedDepths(from: poseSample)
+            let yoloPixelJoints: [BodyJointName: CGPoint]
+            do {
+                yoloPixelJoints = try YOLOBodyPoseDetector.detect(in: cgImage).mapValues(\.point)
+            } catch {
+                // No usable YOLO detection this frame (model load failure, or genuinely no person
+                // found even though Vision found one) — fall back to Vision-only below rather than
+                // failing the whole estimate over the hybrid half not coming together.
+                yoloPixelJoints = [:]
+            }
+
+            let rawWorldPositions: [BodyJointName: SIMD3<Float>]
+            if !yoloPixelJoints.isEmpty, let intrinsics = wallReference?.intrinsics {
+                rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
+                    fromPixelJoints: yoloPixelJoints,
+                    visionDepths: visionDepths,
+                    intrinsics: intrinsics,
+                    cameraTransform: approximateCameraTransform,
+                    wallReference: wallReference
+                )
+            } else {
+                // No YOLO detection, or no wall reference to get intrinsics from at all (Step 1 was
+                // never completed for this session) — original, pre-YOLO Vision-only behavior.
+                rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
+                    from: poseSample,
+                    cameraTransform: approximateCameraTransform,
+                    depthContext: nil,
+                    wallReference: wallReference
+                )
+            }
+
             // This path has NO real depth at all (see this type's doc comment), so it's the most
             // likely of the two generation paths to have bone-proportion errors — see
             // `CalibrationScaleCorrection`'s doc comment. No-ops when `calibratedSegments` is nil
@@ -87,13 +127,15 @@ enum ReconstructionEstimator {
             let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
             // Hand classification needs real depth-grounded hand joints (`handSample: nil` here),
             // so both hands always come back nil -> rendered as an honest "uncertain" marker. Foot
-            // classification only needs body-joint geometry, so it still runs.
+            // classification only needs body-joint geometry, so it still runs. Classifies against
+            // the same PRE-retargeting positions the poseSample-based overload would have used
+            // (retargeting is a display/measurement correction, not something classification here
+            // has ever accounted for).
             let classification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-                poseSample: poseSample,
-                cameraTransform: approximateCameraTransform,
-                depthContext: nil,
+                worldPositions: rawWorldPositions,
                 handSample: nil,
                 handCameraTransform: nil,
+                cameraTransform: approximateCameraTransform,
                 wallReference: wallReference
             )
             return ReconstructionEntry(

@@ -47,6 +47,12 @@ struct ReconstructionView: View {
     /// (which goes back to Step 3's scrubber to pick a different moment): "Done" ends the pipeline
     /// run entirely, while "Back to video" stays within it.
     var onFinished: (() -> Void)? = nil
+    /// Deletes this exact saved reconstruction and dismisses the view — nil (the default) means
+    /// "don't show a delete option at all," which is the right default for a freshly-generated
+    /// live Step 4 view that hasn't necessarily been saved yet. `SavedReconstructionReviewView`
+    /// (session review's "already generated" path) supplies this, since that's the case a coach
+    /// actually wants to clear a bad test result and retest — see its doc comment.
+    var onDelete: (() -> Void)? = nil
     /// Previously-saved 3D-view annotations for this exact reconstruction, if this screen was
     /// reopened from a saved `ReconstructionRecord` (see `Core/Persistence`) rather than freshly
     /// generated — preloaded into `annotationState` on appear. Empty for a brand-new generation.
@@ -88,6 +94,9 @@ struct ReconstructionView: View {
     @State private var draggedJoint: BodyJointName? = nil
     @State private var hasEditedPose: Bool
     @StateObject private var annotationState = AnnotationState()
+    /// Gates the destructive `onDelete` action behind a confirmation — deleting overwrites the
+    /// saved JSON blob with no undo, so this always confirms rather than deleting on first tap.
+    @State private var isConfirmingDelete = false
 
     init(
         wallAnchors: [ARMeshAnchor],
@@ -106,6 +115,7 @@ struct ReconstructionView: View {
         poseError: String?,
         onBack: (() -> Void)? = nil,
         onFinished: (() -> Void)? = nil,
+        onDelete: (() -> Void)? = nil,
         initialAnnotationStrokes: [AnnotationStroke] = [],
         onAnnotationStrokesChanged: (([AnnotationStroke]) -> Void)? = nil,
         initialWorldPositions: [BodyJointName: SIMD3<Float>]? = nil,
@@ -129,6 +139,7 @@ struct ReconstructionView: View {
         self.poseError = poseError
         self.onBack = onBack
         self.onFinished = onFinished
+        self.onDelete = onDelete
         self.initialAnnotationStrokes = initialAnnotationStrokes
         self.onAnnotationStrokesChanged = onAnnotationStrokesChanged
         self.initialWorldPositions = initialWorldPositions
@@ -163,6 +174,15 @@ struct ReconstructionView: View {
                             Label("Done", systemImage: "checkmark")
                         }
                         .buttonStyle(.borderedProminent)
+                    }
+                    if onDelete != nil {
+                        Button(role: .destructive) {
+                            isConfirmingDelete = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
                     }
                     Spacer()
                     modeControls
@@ -220,6 +240,18 @@ struct ReconstructionView: View {
         }
         .onChange(of: jointOverrides) { _, newValue in
             onJointOverridesChanged?(newValue)
+        }
+        .confirmationDialog(
+            "Delete this 3D reconstruction?",
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                onDelete?()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the saved 3D position for this moment so you can generate it again. This can't be undone.")
         }
     }
 

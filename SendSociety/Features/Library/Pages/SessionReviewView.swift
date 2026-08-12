@@ -34,6 +34,43 @@ struct SessionReviewView: View {
     @State private var reviewingEntry: ReconstructionEntry?
     @State private var isGeneratingEstimate = false
     @State private var estimateError: String?
+    /// Set while confirming a delete of `nearbyEntry` — a separate `@State` rather than reusing
+    /// `reviewingEntry` so the confirmation can't accidentally trigger from an unrelated sheet
+    /// presentation. Deletion is destructive/unrecoverable (overwrites the saved JSON blob), so
+    /// this always goes through `.confirmationDialog` rather than deleting on first tap.
+    @State private var pendingDeleteEntry: ReconstructionEntry?
+    /// True while "Preview Skeleton" is toggled on — see `refreshSkeletonPreview()` and
+    /// `skeletonPreview`'s doc comment for how this lets a coach sanity-check a backend's raw
+    /// detection on the current paused frame before committing to Estimate/Generate 3D.
+    @State private var isPreviewingSkeleton = false
+    @State private var skeletonPreview: SkeletonPreviewResult?
+    @State private var isLoadingSkeletonPreview = false
+    @State private var skeletonPreviewError: String?
+    /// Which backend the preview runs — independent of `PoseDetectionSettings.useYOLO` (which
+    /// only affects Step 2/Step 4) on purpose: comparing Vision vs. YOLO on the same paused frame
+    /// is exactly what this preview is for, and forcing a full rebuild just to flip that global
+    /// switch would defeat the point on a device with no compiler access. Defaults to Vision to
+    /// match the app's own safe default.
+    @State private var previewBackend: PreviewBackend = .vision
+
+    private enum PreviewBackend: String, CaseIterable, Identifiable {
+        case vision = "Vision"
+        case yolo = "YOLO"
+        var id: String { rawValue }
+    }
+
+    /// One "Preview Skeleton" result: the exact raw frame that was analyzed, plus whatever 2D
+    /// joint points the selected backend found in it (empty, not nil, when the frame read fine
+    /// but no person was detected — see `SkeletonImageOverlayView`'s doc comment for why that's
+    /// still a useful, honest answer to show). `timestampSeconds`/`backend` let
+    /// `refreshSkeletonPreview()` skip redundant re-detection only when NEITHER the paused
+    /// position NOR the selected backend has actually changed.
+    private struct SkeletonPreviewResult {
+        let image: CGImage
+        let points: [BodyJointName: CGPoint]
+        let timestampSeconds: Double
+        let backend: PreviewBackend
+    }
 
     init(session: RecordingSession, sessionStore: SessionStore, onClose: @escaping () -> Void) {
         self.session = session
@@ -61,7 +98,41 @@ struct SessionReviewView: View {
             .padding()
 
             ZStack {
-                VideoPlayer(player: model.player)
+                // Skeleton preview REPLACES the live player (rather than overlaying on top of
+                // it) while active — both the still frame and the projected points come from the
+                // exact same extracted `CGImage`, so they're guaranteed pixel-aligned; overlaying
+                // on top of the separately-rendered live `VideoPlayer` instead could only ever be
+                // "close" (different rendering/letterboxing pipeline), which would undermine the
+                // entire point of a "does this actually look right" sanity check.
+                if isPreviewingSkeleton, !model.isPlaying, let skeletonPreview {
+                    SkeletonImageOverlayView(
+                        cgImage: skeletonPreview.image,
+                        points: skeletonPreview.points,
+                        deviceOrientation: UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
+                    )
+                } else {
+                    VideoPlayer(player: model.player)
+                }
+                if isPreviewingSkeleton, !model.isPlaying, isLoadingSkeletonPreview {
+                    ProgressView("Detecting pose…")
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+                if isPreviewingSkeleton, !model.isPlaying, let skeletonPreviewError {
+                    Text(skeletonPreviewError)
+                        .font(.caption)
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                } else if isPreviewingSkeleton, !model.isPlaying, let skeletonPreview, skeletonPreview.points.isEmpty, !isLoadingSkeletonPreview {
+                    VStack {
+                        Spacer()
+                        Text("No person detected in this frame.")
+                            .font(.caption)
+                            .padding(8)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(.bottom, 8)
+                    }
+                }
                 if isAnnotating {
                     AnnotationOverlay(state: annotationState)
                     if !model.isPlaying {
@@ -86,12 +157,34 @@ struct SessionReviewView: View {
                         if editing { model.pause() }
                     }
                 )
+                if isPreviewingSkeleton, !model.isPlaying {
+                    // Independent of `PoseDetectionSettings.useYOLO` on purpose — see
+                    // `previewBackend`'s doc comment. Switching here re-runs detection on the SAME
+                    // paused frame with the other backend, so this is the direct way to compare
+                    // Vision vs. YOLO accuracy without touching Step 2/Step 4 at all.
+                    Picker("Preview backend", selection: $previewBackend) {
+                        ForEach(PreviewBackend.allCases) { backend in
+                            Text(backend.rawValue).tag(backend)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: previewBackend) { _, _ in refreshSkeletonPreview() }
+                }
                 HStack {
                     Text(model.isPlaying ? "Playing" : "Paused")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     Spacer()
                     if !model.isPlaying {
+                        Button {
+                            isPreviewingSkeleton.toggle()
+                            if isPreviewingSkeleton { refreshSkeletonPreview() }
+                        } label: {
+                            Label("Preview Skeleton", systemImage: "figure.walk")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(isPreviewingSkeleton ? .green : nil)
+                        .font(.footnote)
                         Button {
                             isAnnotating.toggle()
                         } label: {
@@ -119,6 +212,13 @@ struct SessionReviewView: View {
         .onChange(of: model.isPlaying) { _, isPlaying in
             if !isPlaying { loadAnnotationsForCurrentTime() }
         }
+        .onChange(of: model.currentTime) { _, _ in
+            // Fires ~30x/sec during actual playback too (see `PlaybackModel.currentTime`'s doc
+            // comment) — `refreshSkeletonPreview()` bails immediately in that case, so this is a
+            // cheap no-op except right after a scrub/seek while paused, which is exactly when a
+            // stale preview needs refreshing.
+            refreshSkeletonPreview()
+        }
         .onChange(of: annotationState.strokes) { _, newValue in
             session.setVideoAnnotation(timestampSeconds: annotatedTimestamp, strokes: newValue)
             sessionStore.save()
@@ -143,15 +243,51 @@ struct SessionReviewView: View {
     @ViewBuilder
     private var reconstructionAction: some View {
         if let nearbyEntry {
-            Button {
-                reviewingEntry = nearbyEntry
-            } label: {
-                Text("View 3D Reconstruction")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(.white)
+            HStack(spacing: 8) {
+                Button {
+                    reviewingEntry = nearbyEntry
+                } label: {
+                    Text("View 3D Reconstruction")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                }
+                // Lets a coach clear out a bad/test generation for this exact moment without
+                // opening the full 3D view first — tapping this shows "Estimate 3D View" (or,
+                // once Step 4's live Generate flow is reopened for the same session, "Generate")
+                // again for a clean retest, instead of a stuck "View 3D Reconstruction".
+                Button(role: .destructive) {
+                    pendingDeleteEntry = nearbyEntry
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.headline)
+                        .padding()
+                        .background(Color.red.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.red)
+                }
+            }
+            .confirmationDialog(
+                "Delete this 3D reconstruction?",
+                isPresented: Binding(
+                    get: { pendingDeleteEntry != nil },
+                    set: { if !$0 { pendingDeleteEntry = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let pendingDeleteEntry {
+                        session.removeReconstruction(id: pendingDeleteEntry.id)
+                        sessionStore.save()
+                    }
+                    pendingDeleteEntry = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingDeleteEntry = nil
+                }
+            } message: {
+                Text("This removes the saved 3D position for this moment so you can generate it again. This can't be undone.")
             }
         } else if isGeneratingEstimate {
             HStack {
@@ -206,7 +342,11 @@ struct SessionReviewView: View {
         // `CalibrationScaleCorrection`'s doc comment.
         let calibratedSegments = session.calibration?.segments
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        // Dispatched through `YOLOBodyPoseDetector.queue`, NOT `.global(qos: .userInitiated)` —
+        // `ReconstructionEstimator.estimate` always runs the YOLO+Vision hybrid (never gated by
+        // `PoseDetectionSettings.useYOLO`), so this call needs the same queue-isolation fix as
+        // the skeleton preview below — see `YOLOBodyPoseDetector.queue`'s doc comment for why.
+        YOLOBodyPoseDetector.queue.async {
             do {
                 let entry = try ReconstructionEstimator.estimate(
                     videoURL: url,
@@ -230,6 +370,100 @@ struct SessionReviewView: View {
                 DispatchQueue.main.async {
                     isGeneratingEstimate = false
                     estimateError = "Couldn't read a frame from the video at this moment."
+                }
+            }
+        }
+    }
+
+    /// Pulls the current paused frame and runs Vision on it fresh, purely to draw a 2D skeleton
+    /// overlay for a sanity check — completely separate from `generateEstimate()`, which builds a
+    /// real, saved `ReconstructionEntry`. Nothing here is saved; this is disposable, look-then-
+    /// discard feedback for deciding whether a moment is even worth spending an Estimate/Generate
+    /// 3D on. Runs off the main thread since frame extraction + Vision can take a noticeable
+    /// moment, same as `generateEstimate()`.
+    private func refreshSkeletonPreview() {
+        guard isPreviewingSkeleton, !model.isPlaying else { return }
+        let timestamp = model.currentTime
+        let backend = previewBackend
+        // Already showing exactly this moment with the same backend — nothing changed, skip the
+        // redundant re-detection (this handler also fires on unrelated `currentTime` jitter from
+        // `PlaybackModel`'s periodic time observer settling right after a seek, and now also on
+        // `previewBackend` switching, which SHOULD force a fresh detection on the same frame).
+        if let skeletonPreview, skeletonPreview.backend == backend, abs(skeletonPreview.timestampSeconds - timestamp) < 0.05 { return }
+
+        guard let reference = wallTextureReference else {
+            skeletonPreviewError = "No wall scan camera data saved for this session — can't place the skeleton preview."
+            skeletonPreview = nil
+            return
+        }
+
+        isLoadingSkeletonPreview = true
+        skeletonPreviewError = nil
+        let url = videoURL
+        // Same reasoning as `generateEstimate()`: MUST be this recording's own saved orientation,
+        // not a live/current read — see `ReconstructionEstimator.estimate`'s doc comment.
+        let deviceOrientation = UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
+        let intrinsics = reference.intrinsics
+        let imageResolution = reference.imageResolution
+
+        // Dispatched through `YOLOBodyPoseDetector.queue`, NOT `.global(qos: .userInitiated)` —
+        // even when `backend == .vision` this frame's extraction/Vision work still runs here, but
+        // routing EVERY preview through the same queue keeps this simple and correct regardless
+        // of which backend is selected — see `YOLOBodyPoseDetector.queue`'s doc comment for why
+        // this matters specifically for the `.yolo` case.
+        YOLOBodyPoseDetector.queue.async {
+            guard let cgImage = VideoFrameExtractor.extractFrame(from: url, atSeconds: timestamp) else {
+                DispatchQueue.main.async {
+                    isLoadingSkeletonPreview = false
+                    skeletonPreviewError = "Couldn't read a frame from the video at this moment."
+                    skeletonPreview = nil
+                }
+                return
+            }
+            var points: [BodyJointName: CGPoint] = [:]
+            // Only a genuine "no person in this frame" result is treated as the honest, silent
+            // empty-points answer (same as `ReconstructionEstimator.estimate`'s wall-only-entry
+            // handling) — anything else (model load failure/timeout, etc.) gets surfaced directly
+            // in `skeletonPreviewError` instead of silently reading as "no person detected," which
+            // would be misleading to debug against.
+            var detectionErrorMessage: String?
+            switch backend {
+            case .vision:
+                do {
+                    let sample = try BodyPose3DExtractor.detect(inVideoFrame: cgImage, deviceOrientation: deviceOrientation)
+                    points = BodyPose3DExtractor.projected2DImagePoints(
+                        from: sample,
+                        intrinsics: intrinsics,
+                        imageResolution: imageResolution,
+                        deviceOrientation: deviceOrientation
+                    )
+                } catch BodyPoseError.noPersonDetected {
+                    // Honest empty result — nothing to surface.
+                } catch {
+                    detectionErrorMessage = "Vision detection failed: \(error.localizedDescription)"
+                }
+            case .yolo:
+                // No projection step needed here (unlike Vision above) — YOLO's `.xy` output
+                // already lands in the same raw/unrotated pixel space `cgImage` is in, same as
+                // every other YOLO pixel-joint consumer (`groundPixelJoints`,
+                // `worldJointPositions(fromPixelJoints:...)`). See `YOLOBodyPoseDetector`'s
+                // "COORDINATE SPACE NOTE" doc comment.
+                do {
+                    let joints = try YOLOBodyPoseDetector.detect(in: cgImage)
+                    points = joints.mapValues(\.point)
+                } catch YOLOBodyPoseDetector.DetectionError.noPersonDetected {
+                    // Honest empty result — nothing to surface.
+                } catch {
+                    detectionErrorMessage = error.localizedDescription
+                }
+            }
+            DispatchQueue.main.async {
+                isLoadingSkeletonPreview = false
+                if let detectionErrorMessage {
+                    skeletonPreviewError = detectionErrorMessage
+                    skeletonPreview = nil
+                } else {
+                    skeletonPreview = SkeletonPreviewResult(image: cgImage, points: points, timestampSeconds: timestamp, backend: backend)
                 }
             }
         }

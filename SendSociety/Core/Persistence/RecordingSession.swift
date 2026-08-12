@@ -136,6 +136,14 @@ final class RecordingSession {
         }
         reconstructions = all
     }
+
+    /// Deletes one saved reconstruction by `id` — lets a coach clear out a specific timeframe's
+    /// generated/estimated 3D result (e.g. a bad test run) so `SessionReviewView` shows "Estimate 3D
+    /// View" / "Generate" again for that moment instead of "View 3D Reconstruction", allowing a
+    /// clean retest. No-op if `id` isn't found (already deleted, or never existed).
+    func removeReconstruction(id: UUID) {
+        reconstructions.removeAll { $0.id == id }
+    }
 }
 
 /// One paused moment's 2D screen-space markup during video playback — feedback item #1.

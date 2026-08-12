@@ -44,6 +44,11 @@ struct SavedReconstructionReviewView: View {
             poseError: nil,
             onBack: onClose,
             onFinished: onClose,
+            onDelete: {
+                session.removeReconstruction(id: entry.id)
+                sessionStore.save()
+                onClose()
+            },
             initialAnnotationStrokes: entry.annotationStrokes,
             onAnnotationStrokesChanged: { strokes in
                 var updated = entry
