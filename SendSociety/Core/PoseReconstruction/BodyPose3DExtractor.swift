@@ -164,6 +164,19 @@ enum BodyPose3DExtractor {
         )
     }
 
+    /// A source of per-pixel brightness for the bilateral-weighted depth lookup
+    /// (`lidarGroundedCameraSpacePosition`'s `nearestConfidentDepth` replacement) — deliberately an
+    /// enum rather than a single `CVPixelBuffer` field on `DepthGroundingContext`, because the two
+    /// places that can supply a color frame hand it over in genuinely different native formats:
+    /// a live/stored ARKit frame's `capturedImage` (bi-planar YCbCr — `.pixelBuffer`), or a
+    /// `CGImage` re-extracted from a saved video via `VideoFrameExtractor` for Step 4, which has no
+    /// live ARFrame to read from at all (`.cgImage`). See `LockedLuma`/`lockLuma` for how each case
+    /// is turned into a plain per-pixel brightness read.
+    enum LumaSource {
+        case pixelBuffer(CVPixelBuffer)
+        case cgImage(CGImage)
+    }
+
     /// Bundles everything needed to ground a Vision joint estimate in real LiDAR depth: the
     /// camera pose/intrinsics for the SAME frame the joint was detected in, plus that frame's
     /// real depth/confidence maps. Built either from a live `ARFrame` (Step 2 calibration) or
@@ -180,6 +193,41 @@ enum BodyPose3DExtractor {
         /// correction in `lidarGroundedCameraSpacePosition` silently uses the wrong orientation.
         /// See `RecordedFrameData.deviceOrientation`'s doc comment for the full story.
         let deviceOrientation: UIDeviceOrientation
+        /// Optional source of per-pixel brightness for bilateral-weighted depth grounding (see
+        /// `LumaSource`'s doc comment) — nil means "no color available for this context," in
+        /// which case grounding transparently falls back to the older nearest-valid-neighbor
+        /// search (`nearestConfidentDepth`) with no behavior change from before this feature
+        /// existed. Defaulted to nil here (rather than a required initializer parameter)
+        /// specifically so `RecordedFrameStore.swift`'s `RecordedFrameData.depthGroundingContext`
+        /// — which, BY DESIGN, has no color image to offer — keeps compiling completely
+        /// unchanged; see that type's doc comment for the on-device OOM-crash history that makes
+        /// "just store the color image too" a hard constraint, not an oversight. Step 4
+        /// (`LiveReconstructionGenerator`) attaches one after the fact via `withLumaSource(_:)`,
+        /// reusing the color frame it already re-extracts from the saved video for Vision
+        /// detection anyway — no extra decode/storage cost.
+        let lumaSource: LumaSource?
+
+        /// Explicit initializer (rather than relying on the synthesized memberwise one) so
+        /// `lumaSource` can default to nil at every existing call site — including
+        /// `RecordedFrameStore.swift`'s `RecordedFrameData.depthGroundingContext`, which never
+        /// passes it at all — without those call sites needing any change.
+        init(
+            cameraTransform: simd_float4x4,
+            intrinsics: simd_float3x3,
+            imageResolution: CGSize,
+            depthMap: CVPixelBuffer,
+            confidenceMap: CVPixelBuffer?,
+            deviceOrientation: UIDeviceOrientation,
+            lumaSource: LumaSource? = nil
+        ) {
+            self.cameraTransform = cameraTransform
+            self.intrinsics = intrinsics
+            self.imageResolution = imageResolution
+            self.depthMap = depthMap
+            self.confidenceMap = confidenceMap
+            self.deviceOrientation = deviceOrientation
+            self.lumaSource = lumaSource
+        }
 
         static func from(frame: ARFrame, deviceOrientation: UIDeviceOrientation = UIDevice.current.orientation) -> DepthGroundingContext? {
             guard let sceneDepth = frame.sceneDepth else { return nil }
@@ -189,7 +237,25 @@ enum BodyPose3DExtractor {
                 imageResolution: frame.camera.imageResolution,
                 depthMap: sceneDepth.depthMap,
                 confidenceMap: sceneDepth.confidenceMap,
-                deviceOrientation: deviceOrientation
+                deviceOrientation: deviceOrientation,
+                lumaSource: .pixelBuffer(frame.capturedImage)
+            )
+        }
+
+        /// Returns a copy of this context with `lumaSource` attached — see `lumaSource`'s doc
+        /// comment for why this is a separate step rather than a constructor parameter available
+        /// everywhere. Used by `LiveReconstructionGenerator` to attach the color frame it already
+        /// re-extracted from the saved video, without `RecordedFrameData` itself ever needing to
+        /// store color data.
+        func withLumaSource(_ lumaSource: LumaSource) -> DepthGroundingContext {
+            DepthGroundingContext(
+                cameraTransform: cameraTransform,
+                intrinsics: intrinsics,
+                imageResolution: imageResolution,
+                depthMap: depthMap,
+                confidenceMap: confidenceMap,
+                deviceOrientation: deviceOrientation,
+                lumaSource: lumaSource
             )
         }
     }
@@ -233,7 +299,8 @@ enum BodyPose3DExtractor {
         depthBase: UnsafeMutableRawPointer,
         depthBytesPerRow: Int,
         confidenceBase: UnsafeMutableRawPointer?,
-        confidenceBytesPerRow: Int
+        confidenceBytesPerRow: Int,
+        luma: LockedLuma?
     ) -> (position: SIMD3<Float>, isGrounded: Bool) {
         let local = SIMD4<Float>(rootRelative.x, rootRelative.y, rootRelative.z, 1)
         let visionCameraSpace4 = cameraOriginMatrix * local
@@ -277,11 +344,36 @@ enum BodyPose3DExtractor {
         let depthY = Int(v / height * Float(depthHeight))
         guard depthX >= 0, depthX < depthWidth, depthY >= 0, depthY < depthHeight else { return (visionOnlyFallback, false) }
 
-        guard let lidarDepth = nearestConfidentDepth(
-            depthBase: depthBase, depthBytesPerRow: depthBytesPerRow,
-            confidenceBase: confidenceBase, confidenceBytesPerRow: confidenceBytesPerRow,
-            width: depthWidth, height: depthHeight, x: depthX, y: depthY
-        ) else {
+        // Bilateral upgrade: when a color frame is available (`luma` non-nil — see
+        // `DepthGroundingContext.lumaSource`'s doc comment for when that is/isn't the case),
+        // weight candidate depth pixels by BOTH spatial distance AND how similar their brightness
+        // is to this exact joint's own pixel, so a same-surface neighbor (e.g. more of the hand)
+        // is trusted over a spatially-closer but different-colored one (e.g. the wall right next
+        // to a hand on a hold) — see `bilateralWeightedDepth`'s doc comment. Falls back to the
+        // original nearest-valid-neighbor search with NO behavior change whenever `luma` is nil or
+        // this exact pixel's brightness can't be read (e.g. projected just outside the color
+        // image's own bounds after depth-grid rounding).
+        let lidarDepth: Float?
+        if let luma, let targetLuma = luma.brightness(x: Int(u), y: Int(v)) {
+            lidarDepth = bilateralWeightedDepth(
+                depthBase: depthBase, depthBytesPerRow: depthBytesPerRow,
+                confidenceBase: confidenceBase, confidenceBytesPerRow: confidenceBytesPerRow,
+                depthWidth: depthWidth, depthHeight: depthHeight,
+                targetDepthX: depthX, targetDepthY: depthY,
+                luma: luma, targetLuma: targetLuma
+            ) ?? nearestConfidentDepth(
+                depthBase: depthBase, depthBytesPerRow: depthBytesPerRow,
+                confidenceBase: confidenceBase, confidenceBytesPerRow: confidenceBytesPerRow,
+                width: depthWidth, height: depthHeight, x: depthX, y: depthY
+            )
+        } else {
+            lidarDepth = nearestConfidentDepth(
+                depthBase: depthBase, depthBytesPerRow: depthBytesPerRow,
+                confidenceBase: confidenceBase, confidenceBytesPerRow: confidenceBytesPerRow,
+                width: depthWidth, height: depthHeight, x: depthX, y: depthY
+            )
+        }
+        guard let lidarDepth else {
             return (visionOnlyFallback, false)
         }
 
@@ -377,7 +469,8 @@ enum BodyPose3DExtractor {
                 depthBase: buffers.depthBase,
                 depthBytesPerRow: buffers.depthBytesPerRow,
                 confidenceBase: buffers.confidenceBase,
-                confidenceBytesPerRow: buffers.confidenceBytesPerRow
+                confidenceBytesPerRow: buffers.confidenceBytesPerRow,
+                luma: buffers.luma
             )
             guard result.isGrounded else { return nil }
             grounded[joint] = result.position
@@ -433,7 +526,8 @@ enum BodyPose3DExtractor {
                 depthBase: buffers.depthBase,
                 depthBytesPerRow: buffers.depthBytesPerRow,
                 confidenceBase: buffers.confidenceBase,
-                confidenceBytesPerRow: buffers.confidenceBytesPerRow
+                confidenceBytesPerRow: buffers.confidenceBytesPerRow,
+                luma: buffers.luma
             )
             grounded[joint] = result.position
             if !result.isGrounded {
@@ -461,12 +555,18 @@ enum BodyPose3DExtractor {
         let confidenceBytesPerRow: Int
         let depthMap: CVPixelBuffer
         let confidenceMap: CVPixelBuffer?
+        /// nil whenever `DepthGroundingContext.lumaSource` was nil, OR locking/reading it failed —
+        /// either way, `lidarGroundedCameraSpacePosition` treats a nil `luma` here exactly like
+        /// "no color available," falling back to the original nearest-valid-neighbor search with
+        /// no behavior change.
+        let luma: LockedLuma?
 
         func unlock() {
             CVPixelBufferUnlockBaseAddress(depthMap, .readOnly)
             if let confidenceMap {
                 CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly)
             }
+            luma?.unlock()
         }
     }
 
@@ -496,8 +596,189 @@ enum BodyPose3DExtractor {
             confidenceBase: confidenceBase,
             confidenceBytesPerRow: confidenceBytesPerRow,
             depthMap: depthMap,
-            confidenceMap: confidenceMap
+            confidenceMap: confidenceMap,
+            luma: lockLuma(context.lumaSource)
         )
+    }
+
+    /// Prepared, ready-to-read form of a `LumaSource` — locked/decoded ONCE per grounding call
+    /// (mirrors `LockedDepthBuffers`' own "lock once, read many times" pattern) and handed to
+    /// `bilateralWeightedDepth` for repeated fast per-pixel brightness reads. Caller MUST call
+    /// `unlock()` exactly once (handled automatically by `LockedDepthBuffers.unlock()`).
+    private struct LockedLuma {
+        let width: Int
+        let height: Int
+        private let pixelBufferBase: UnsafeMutableRawPointer?
+        private let pixelBufferBytesPerRow: Int
+        private let pixelBufferToUnlock: CVPixelBuffer?
+        /// Populated only for the `.cgImage` case (Step 4) — a plain 8-bit grayscale raster of
+        /// the WHOLE color frame, decoded once via Core Graphics rather than read byte-by-byte
+        /// from the `CGImage`'s own raw data. Deliberately NOT reading `CGImage.dataProvider`'s
+        /// raw bytes directly and assuming an R/G/B channel order: that layout depends on the
+        /// image's `bitmapInfo`, which varies by source/OS version and isn't worth guessing at
+        /// with no compiler/device available to verify it against. Rendering into an explicitly
+        /// `CGColorSpaceCreateDeviceGray()` / 8-bit-no-alpha context instead makes Core Graphics
+        /// do that color conversion correctly, at the one-time cost of a single CGContext draw
+        /// per Step 4 "Generate" (negligible next to the Vision calls already happening in the
+        /// same call).
+        private let grayscalePixels: [UInt8]?
+
+        init(
+            width: Int,
+            height: Int,
+            pixelBufferBase: UnsafeMutableRawPointer? = nil,
+            pixelBufferBytesPerRow: Int = 0,
+            pixelBufferToUnlock: CVPixelBuffer? = nil,
+            grayscalePixels: [UInt8]? = nil
+        ) {
+            self.width = width
+            self.height = height
+            self.pixelBufferBase = pixelBufferBase
+            self.pixelBufferBytesPerRow = pixelBufferBytesPerRow
+            self.pixelBufferToUnlock = pixelBufferToUnlock
+            self.grayscalePixels = grayscalePixels
+        }
+
+        /// Returns a 0-255 brightness value at (x, y), or nil if out of bounds. For the
+        /// `.pixelBuffer` case this reads plane 0 of a bi-planar YCbCr buffer (luma), matching
+        /// exactly what `VNImageRequestHandler`/Vision itself reads for detection — the SAME
+        /// surface, so "similar brightness" genuinely means "likely the same physical surface."
+        func brightness(x: Int, y: Int) -> Float? {
+            guard x >= 0, x < width, y >= 0, y < height else { return nil }
+            if let pixelBufferBase {
+                let value = (pixelBufferBase + y * pixelBufferBytesPerRow).assumingMemoryBound(to: UInt8.self)[x]
+                return Float(value)
+            }
+            if let grayscalePixels {
+                return Float(grayscalePixels[y * width + x])
+            }
+            return nil
+        }
+
+        func unlock() {
+            if let pixelBufferToUnlock {
+                CVPixelBufferUnlockBaseAddress(pixelBufferToUnlock, .readOnly)
+            }
+        }
+    }
+
+    /// Prepares a `LumaSource` for repeated fast brightness reads — nil (a soft failure, not a
+    /// hard error) whenever `source` is nil, or the underlying buffer/image couldn't be
+    /// locked/decoded, either of which just means "grounding falls back to the original
+    /// nearest-valid-neighbor search for this frame" rather than aborting anything.
+    private static func lockLuma(_ source: LumaSource?) -> LockedLuma? {
+        guard let source else { return nil }
+        switch source {
+        case .pixelBuffer(let buffer):
+            CVPixelBufferLockBaseAddress(buffer, .readOnly)
+            guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0) else {
+                CVPixelBufferUnlockBaseAddress(buffer, .readOnly)
+                return nil
+            }
+            return LockedLuma(
+                width: CVPixelBufferGetWidthOfPlane(buffer, 0),
+                height: CVPixelBufferGetHeightOfPlane(buffer, 0),
+                pixelBufferBase: base,
+                pixelBufferBytesPerRow: CVPixelBufferGetBytesPerRowOfPlane(buffer, 0),
+                pixelBufferToUnlock: buffer
+            )
+        case .cgImage(let image):
+            let width = image.width
+            let height = image.height
+            guard width > 0, height > 0 else { return nil }
+            var pixels = [UInt8](repeating: 0, count: width * height)
+            let didDraw: Bool = pixels.withUnsafeMutableBytes { buffer in
+                guard let context = CGContext(
+                    data: buffer.baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: width,
+                    space: CGColorSpaceCreateDeviceGray(),
+                    bitmapInfo: CGImageAlphaInfo.none.rawValue
+                ) else { return false }
+                context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+                return true
+            }
+            guard didDraw else { return nil }
+            return LockedLuma(width: width, height: height, grayscalePixels: pixels)
+        }
+    }
+
+    /// Bilateral-weighted depth lookup — the fix for the "hand near a hold grabs the wall's depth
+    /// instead of the hand's" failure mode: a wall pixel a couple grid-cells away is often the
+    /// FIRST valid depth `nearestConfidentDepth`'s plain nearest-neighbor search finds (LiDAR
+    /// confidence tends to drop out right at a hand/hold's own edge), even though it's the wrong
+    /// surface. This averages every candidate within `searchRadius`, weighting each one by both
+    /// spatial closeness AND how similar its color-frame brightness is to the target joint's own
+    /// pixel — a same-surface neighbor (e.g. more of the hand) scores far higher than a
+    /// spatially-closer but different-colored one (e.g. the wall right beside it), even when the
+    /// wall pixel is technically nearer. Mirrors the joint/cross-bilateral-upsampling idea from
+    /// https://www.mdpi.com/1424-8220/23/19/8216 (the same paper `nearestConfidentDepth` already
+    /// cites), extended with the color/luma similarity term that paper's Section 3 proposes.
+    ///
+    /// Returns nil (falls back to `nearestConfidentDepth` at the call site) if no candidate in the
+    /// search window has both a valid depth reading AND a readable brightness value.
+    private static func bilateralWeightedDepth(
+        depthBase: UnsafeMutableRawPointer,
+        depthBytesPerRow: Int,
+        confidenceBase: UnsafeMutableRawPointer?,
+        confidenceBytesPerRow: Int,
+        depthWidth: Int,
+        depthHeight: Int,
+        targetDepthX: Int,
+        targetDepthY: Int,
+        luma: LockedLuma,
+        targetLuma: Float,
+        searchRadius: Int = 4,
+        spatialSigma: Float = 2.0,
+        lumaSigma: Float = 25.0
+    ) -> Float? {
+        func rawDepth(_ px: Int, _ py: Int) -> Float? {
+            guard px >= 0, px < depthWidth, py >= 0, py < depthHeight else { return nil }
+            let value = (depthBase + py * depthBytesPerRow).assumingMemoryBound(to: Float32.self)[px]
+            guard value.isFinite, value > 0 else { return nil }
+            if let confidenceBase {
+                let raw = (confidenceBase + py * confidenceBytesPerRow).assumingMemoryBound(to: UInt8.self)[px]
+                guard let level = ARConfidenceLevel(rawValue: Int(raw)), level.rawValue >= ARConfidenceLevel.medium.rawValue else {
+                    return nil
+                }
+            }
+            return value
+        }
+
+        // The color image and the depth grid are very likely different resolutions (e.g. a
+        // 1920x1440 color frame vs. a much coarser LiDAR depth grid) — this scales a depth-grid
+        // coordinate into the color/luma image's own coordinate space for each candidate.
+        let lumaScaleX = Float(luma.width) / Float(depthWidth)
+        let lumaScaleY = Float(luma.height) / Float(depthHeight)
+
+        var weightedDepthSum: Float = 0
+        var weightSum: Float = 0
+        for dy in -searchRadius...searchRadius {
+            for dx in -searchRadius...searchRadius {
+                let px = targetDepthX + dx
+                let py = targetDepthY + dy
+                guard let depth = rawDepth(px, py) else { continue }
+                let lx = Int(Float(px) * lumaScaleX)
+                let ly = Int(Float(py) * lumaScaleY)
+                guard let candidateLuma = luma.brightness(x: lx, y: ly) else { continue }
+
+                let spatialDistSq = Float(dx * dx + dy * dy)
+                let spatialWeight = exp(-spatialDistSq / (2 * spatialSigma * spatialSigma))
+                let lumaDiff = candidateLuma - targetLuma
+                let lumaWeight = exp(-(lumaDiff * lumaDiff) / (2 * lumaSigma * lumaSigma))
+                let weight = spatialWeight * lumaWeight
+
+                weightedDepthSum += depth * weight
+                weightSum += weight
+            }
+        }
+        // A near-zero total weight means every candidate was either invalid or scored as "surely
+        // a different surface" — not enough signal to trust an average, so let the caller fall
+        // back to plain nearest-valid-neighbor instead.
+        guard weightSum > 0.01 else { return nil }
+        return weightedDepthSum / weightSum
     }
 
     /// Searches a small expanding-ring neighborhood around (x,y) for the nearest pixel with a

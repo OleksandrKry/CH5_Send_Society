@@ -74,8 +74,8 @@ enum LiveReconstructionGenerator {
         // Same real depth data the wall mesh itself was built from — this is what lets Step 4 place
         // the skeleton against the wall using real measurements instead of Vision's own (much less
         // reliable) depth estimate.
-        let depthContext = frameData.depthGroundingContext
-        if depthContext == nil {
+        let baseDepthContext = frameData.depthGroundingContext
+        if baseDepthContext == nil {
             DebugLog.reconstruction.error("No depth data for this paused frame — skeleton placement will use Vision's raw (less accurate) estimate")
         }
 
@@ -89,6 +89,13 @@ enum LiveReconstructionGenerator {
             DebugLog.reconstruction.error("VideoFrameExtractor returned nil at playback second \(seconds, privacy: .public)")
             throw GenerationError.couldNotReadFrame
         }
+
+        // Attach the color frame just extracted above to the depth context for bilateral-weighted
+        // depth grounding (see `BodyPose3DExtractor.LumaSource`'s doc comment) — this is the SAME
+        // image already needed for Vision detection below, re-extracted from the saved video
+        // specifically because `RecordedFrameData` deliberately never stores color itself. No-op
+        // (stays nil) when there was no depth data at all for this frame.
+        let depthContext = baseDepthContext?.withLumaSource(.cgImage(mainImage))
 
         var poseSample: BodyPoseSample?
         var poseError: String?
