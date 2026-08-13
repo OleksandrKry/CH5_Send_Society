@@ -111,9 +111,19 @@ struct PlaybackView: View {
         }
         .onChange(of: model.isPlaying) { _, isPlaying in
             // Reload whatever's saved for the new paused position (or clear, if nothing's saved
-            // there) every time playback pauses/a scrub ends — this is the one point where
-            // "current timestamp bucket" is stable enough to key annotations off of.
+            // there) every time playback pauses — covers "was playing, tapped Pause".
             if !isPlaying {
+                loadAnnotationsForCurrentTime()
+            }
+        }
+        .onChange(of: model.currentTime) { _, _ in
+            // Covers "was ALREADY paused, then dragged the slider" — `isPlaying` never toggles in
+            // that case (it's false before and after), so the `onChange(of: model.isPlaying)`
+            // above never fires and the old annotation would otherwise just stay stuck on screen
+            // no matter where the scrubber moves to. Guarded to only reload while paused, since
+            // during actual playback `currentTime` changes ~30x/sec and the overlay is hidden
+            // anyway (see the `!model.isPlaying` check on the auto-preview above).
+            if !model.isPlaying {
                 loadAnnotationsForCurrentTime()
             }
         }

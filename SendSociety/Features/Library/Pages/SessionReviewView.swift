@@ -195,9 +195,17 @@ struct SessionReviewView: View {
         }
         .onChange(of: model.currentTime) { _, _ in
             // Fires ~30x/sec during actual playback too (see `PlaybackModel.currentTime`'s doc
-            // comment) — `refreshSkeletonPreview()` bails immediately in that case, so this is a
-            // cheap no-op except right after a scrub/seek while paused, which is exactly when a
-            // stale preview needs refreshing.
+            // comment) — both calls below bail/no-op immediately in that case (`isPlaying` guards),
+            // so this is cheap except right after a scrub/seek while paused, which is exactly when
+            // a stale annotation or skeleton preview needs refreshing.
+            //
+            // The annotation reload specifically covers "was ALREADY paused, then dragged the
+            // slider" — `model.isPlaying` never toggles in that case (false before and after), so
+            // the `onChange(of: model.isPlaying)` above never fires, and without this, whatever
+            // annotation was loaded last would stay stuck on screen no matter where you scrub to.
+            if !model.isPlaying {
+                loadAnnotationsForCurrentTime()
+            }
             refreshSkeletonPreview()
         }
         .onChange(of: annotationState.strokes) { _, newValue in
