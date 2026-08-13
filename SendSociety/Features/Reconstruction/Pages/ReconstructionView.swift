@@ -25,21 +25,6 @@ struct ReconstructionView: View {
     /// available in RecordedFrameStore — see ReconstructionEntityBuilder.worldJointPositions for
     /// how this is used to ground the skeleton instead of trusting Vision's own depth guess.
     let depthContext: BodyPose3DExtractor.DepthGroundingContext?
-    /// Classified grip/foot-placement type + confidence for each limb, if classification could be
-    /// attempted at all — see `GripClassifier`. nil, or a confidence below
-    /// `GripClassifier.confidenceThreshold`, both render as an honest "uncertain" marker rather
-    /// than a named preset (see `ReconstructionEntityBuilder.handAttachmentEntity`).
-    let leftGrip: GripClassification?
-    let rightGrip: GripClassification?
-    let leftFoot: FootClassification?
-    let rightFoot: FootClassification?
-    /// Non-nil only when the corresponding classification was recovered from a nearby frame
-    /// instead of the exact paused one — shown as an explicit "estimated from Xs earlier/later"
-    /// label, mirroring the pattern already used for raw hand-position recovery.
-    var leftGripOffsetSeconds: TimeInterval? = nil
-    var rightGripOffsetSeconds: TimeInterval? = nil
-    var leftFootOffsetSeconds: TimeInterval? = nil
-    var rightFootOffsetSeconds: TimeInterval? = nil
     let poseError: String?
     var onBack: (() -> Void)? = nil
     /// Called when the coach explicitly says they're done with this whole recording (shown as a
@@ -47,6 +32,12 @@ struct ReconstructionView: View {
     /// (which goes back to Step 3's scrubber to pick a different moment): "Done" ends the pipeline
     /// run entirely, while "Back to video" stays within it.
     var onFinished: (() -> Void)? = nil
+    /// Deletes this exact saved reconstruction and dismisses the view — nil (the default) means
+    /// "don't show a delete option at all," which is the right default for a freshly-generated
+    /// live Step 4 view that hasn't necessarily been saved yet. `SavedReconstructionReviewView`
+    /// (session review's "already generated" path) supplies this, since that's the case a coach
+    /// actually wants to clear a bad test result and retest — see its doc comment.
+    var onDelete: (() -> Void)? = nil
     /// Previously-saved 3D-view annotations for this exact reconstruction, if this screen was
     /// reopened from a saved `ReconstructionRecord` (see `Core/Persistence`) rather than freshly
     /// generated — preloaded into `annotationState` on appear. Empty for a brand-new generation.
@@ -88,6 +79,9 @@ struct ReconstructionView: View {
     @State private var draggedJoint: BodyJointName? = nil
     @State private var hasEditedPose: Bool
     @StateObject private var annotationState = AnnotationState()
+    /// Gates the destructive `onDelete` action behind a confirmation — deleting overwrites the
+    /// saved JSON blob with no undo, so this always confirms rather than deleting on first tap.
+    @State private var isConfirmingDelete = false
 
     init(
         wallAnchors: [ARMeshAnchor],
@@ -95,17 +89,10 @@ struct ReconstructionView: View {
         poseSample: BodyPoseSample?,
         cameraTransform: simd_float4x4?,
         depthContext: BodyPose3DExtractor.DepthGroundingContext?,
-        leftGrip: GripClassification?,
-        rightGrip: GripClassification?,
-        leftFoot: FootClassification?,
-        rightFoot: FootClassification?,
-        leftGripOffsetSeconds: TimeInterval? = nil,
-        rightGripOffsetSeconds: TimeInterval? = nil,
-        leftFootOffsetSeconds: TimeInterval? = nil,
-        rightFootOffsetSeconds: TimeInterval? = nil,
         poseError: String?,
         onBack: (() -> Void)? = nil,
         onFinished: (() -> Void)? = nil,
+        onDelete: (() -> Void)? = nil,
         initialAnnotationStrokes: [AnnotationStroke] = [],
         onAnnotationStrokesChanged: (([AnnotationStroke]) -> Void)? = nil,
         initialWorldPositions: [BodyJointName: SIMD3<Float>]? = nil,
@@ -118,17 +105,10 @@ struct ReconstructionView: View {
         self.poseSample = poseSample
         self.cameraTransform = cameraTransform
         self.depthContext = depthContext
-        self.leftGrip = leftGrip
-        self.rightGrip = rightGrip
-        self.leftFoot = leftFoot
-        self.rightFoot = rightFoot
-        self.leftGripOffsetSeconds = leftGripOffsetSeconds
-        self.rightGripOffsetSeconds = rightGripOffsetSeconds
-        self.leftFootOffsetSeconds = leftFootOffsetSeconds
-        self.rightFootOffsetSeconds = rightFootOffsetSeconds
         self.poseError = poseError
         self.onBack = onBack
         self.onFinished = onFinished
+        self.onDelete = onDelete
         self.initialAnnotationStrokes = initialAnnotationStrokes
         self.onAnnotationStrokesChanged = onAnnotationStrokesChanged
         self.initialWorldPositions = initialWorldPositions
@@ -141,7 +121,7 @@ struct ReconstructionView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            ReconstructionSceneView(wallAnchors: wallAnchors, wallTextureReference: wallTextureReference, poseSample: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, leftGrip: leftGrip, rightGrip: rightGrip, leftFoot: leftFoot, rightFoot: rightFoot, isEditingPose: isEditingPose, jointOverrides: $jointOverrides, draggedJoint: $draggedJoint, hasEditedPose: $hasEditedPose, initialWorldPositions: initialWorldPositions)
+            ReconstructionSceneView(wallAnchors: wallAnchors, wallTextureReference: wallTextureReference, poseSample: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, isEditingPose: isEditingPose, jointOverrides: $jointOverrides, draggedJoint: $draggedJoint, hasEditedPose: $hasEditedPose, initialWorldPositions: initialWorldPositions)
                 .ignoresSafeArea()
                 .allowsHitTesting(!isAnnotating)
 
@@ -164,12 +144,21 @@ struct ReconstructionView: View {
                         }
                         .buttonStyle(.borderedProminent)
                     }
+                    if onDelete != nil {
+                        Button(role: .destructive) {
+                            isConfirmingDelete = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.red)
+                    }
                     Spacer()
                     modeControls
                 }
                 Text("Step 4 — Static 3D Reconstruction").font(.headline)
                 if isApproximate {
-                    Label("Estimated placement — no LiDAR depth for this moment, so this uses Vision's own estimate and the wall's saved camera position. Less precise than a live-generated view; hand grips aren't classified.", systemImage: "exclamationmark.triangle")
+                    Label("Estimated placement — no LiDAR depth for this moment, so this uses Vision's own estimate and the wall's saved camera position. Less precise than a live-generated view.", systemImage: "exclamationmark.triangle")
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
@@ -195,9 +184,6 @@ struct ReconstructionView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                if (poseSample != nil || initialWorldPositions != nil), !isEditingPose, !isAnnotating {
-                    classificationSummary
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -220,6 +206,18 @@ struct ReconstructionView: View {
         }
         .onChange(of: jointOverrides) { _, newValue in
             onJointOverridesChanged?(newValue)
+        }
+        .confirmationDialog(
+            "Delete this 3D reconstruction?",
+            isPresented: $isConfirmingDelete,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                onDelete?()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the saved 3D position for this moment so you can generate it again. This can't be undone.")
         }
     }
 
@@ -259,36 +257,6 @@ struct ReconstructionView: View {
         }
     }
 
-    /// Per-limb grip/foot-placement readout — see `GripClassifier`. A confident classification
-    /// shows the preset name + confidence in teal (matching the preset pose's render color); a
-    /// nil-or-low-confidence one shows "uncertain" in orange (matching the same "not confident"
-    /// color used elsewhere in this app, e.g. the tracking-quality cue) — a visible "not sure"
-    /// instead of a confident-looking wrong guess, per the feature's required fallback behavior.
-    private var classificationSummary: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            classificationLine(label: "Left hand", name: leftGrip?.type.displayName, confidence: leftGrip?.confidence, offset: leftGripOffsetSeconds)
-            classificationLine(label: "Right hand", name: rightGrip?.type.displayName, confidence: rightGrip?.confidence, offset: rightGripOffsetSeconds)
-            classificationLine(label: "Left foot", name: leftFoot?.type.displayName, confidence: leftFoot?.confidence, offset: leftFootOffsetSeconds)
-            classificationLine(label: "Right foot", name: rightFoot?.type.displayName, confidence: rightFoot?.confidence, offset: rightFootOffsetSeconds)
-        }
-        .font(.footnote)
-    }
-
-    private func classificationLine(label: String, name: String?, confidence: Float?, offset: TimeInterval?) -> some View {
-        let isConfident = (confidence ?? 0) >= GripClassifier.confidenceThreshold
-        return HStack(spacing: 4) {
-            Text("\(label):").foregroundStyle(.secondary)
-            if isConfident, let name, let confidence {
-                Text("\(name) (\(Int(confidence * 100))%)").foregroundStyle(.teal)
-            } else {
-                Text("uncertain").foregroundStyle(.orange)
-            }
-            if let offset {
-                Text(String(format: "· est. %.1fs %@", abs(offset), offset < 0 ? "earlier" : "later"))
-                    .foregroundStyle(.orange)
-            }
-        }
-    }
 }
 
 // `ReconstructionSceneView` (the RealityKit UIViewRepresentable rendering component + its
@@ -307,10 +275,6 @@ struct ReconstructionView: View {
         poseSample: nil,
         cameraTransform: nil,
         depthContext: nil,
-        leftGrip: nil,
-        rightGrip: nil,
-        leftFoot: nil,
-        rightFoot: nil,
         poseError: nil
     )
 }

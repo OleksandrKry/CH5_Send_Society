@@ -4,9 +4,8 @@ import UIKit
 import simd
 
 /// Runs the full live Step 4 "Generate" pipeline for one paused video moment: real per-frame LiDAR
-/// depth/camera-pose lookup, Vision body-pose detection, grip/foot classification, and (if any limb
-/// classification comes back low-confidence) a nearby-frame fallback search — everything
-/// `ContentView`'s `ReconstructionHost.generate()` used to do inline.
+/// depth/camera-pose lookup and Vision body-pose detection — everything `ContentView`'s
+/// `ReconstructionHost.generate()` used to do inline.
 ///
 /// PULLED OUT ON PURPOSE, same reasoning as `ReconstructionEstimator`: this is the actual
 /// pose-reconstruction algorithm, so it belongs in this module next to `BodyPose3DExtractor` /
@@ -16,7 +15,7 @@ import simd
 ///
 /// Unlike `ReconstructionEstimator` (which never has real depth), this path DOES have real LiDAR
 /// data recorded during the live AR session (`RecordedFrameStore`) — see `Result`'s fields for how
-/// that's threaded all the way through to hand classification and world-position grounding.
+/// that's threaded all the way through to world-position grounding.
 enum LiveReconstructionGenerator {
     /// Thrown only for the two "nothing at all to work with" cases. A frame that reads fine but has
     /// no detectable body still produces a normal `Result` (with `poseSample == nil`), exactly like
@@ -34,25 +33,17 @@ enum LiveReconstructionGenerator {
     /// `depthContext` are always real (never a placeholder) whenever this succeeds at all — even
     /// when no body was detected, since the wall-only view still benefits from a real camera seed
     /// (see `ContentView`'s original comments on why `recordingCameraTransform` exists separately
-    /// from the classification-only `cameraTransform`). `poseSample == nil` (with `poseError` set)
-    /// is a legitimate, non-throwing outcome — mirrors `generate()`'s original "no climber detected"
-    /// handling.
+    /// from `cameraTransform`). `poseSample == nil` (with `poseError` set) is a legitimate,
+    /// non-throwing outcome — mirrors `generate()`'s original "no climber detected" handling.
     struct Result {
         let cameraTransform: simd_float4x4
         let depthContext: BodyPose3DExtractor.DepthGroundingContext?
         let poseSample: BodyPoseSample?
         let poseError: String?
-        let leftGrip: GripClassification?
-        let rightGrip: GripClassification?
-        let leftFoot: FootClassification?
-        let rightFoot: FootClassification?
-        /// Non-nil only when the corresponding classification above was recovered from a nearby
-        /// frame instead of the exact paused one — see the nearby-frame fallback search below.
-        let leftGripOffsetSeconds: TimeInterval?
-        let rightGripOffsetSeconds: TimeInterval?
-        let leftFootOffsetSeconds: TimeInterval?
-        let rightFootOffsetSeconds: TimeInterval?
-        /// nil exactly when `poseSample` is nil (no body detected, nothing to ground).
+        /// nil exactly when no body was detected/grounded at all (`poseSample` nil). These are the
+        /// FINAL world-space positions — `ContentView` must render from THIS field directly
+        /// (`ReconstructionView.initialWorldPositions`) rather than re-deriving positions from
+        /// `poseSample`.
         let worldPositions: [BodyJointName: SIMD3<Float>]?
     }
 
@@ -61,8 +52,7 @@ enum LiveReconstructionGenerator {
     /// did before this was extracted.
     static func generate(
         input: ReconstructionInput,
-        wallReference: ARSessionManager.WallTextureReference?,
-        calibratedSegments: SegmentLengths? = nil
+        wallReference: ARSessionManager.WallTextureReference?
     ) throws -> Result {
         guard let frameData = input.frameStore.nearestFrame(toPlaybackSeconds: input.pausedSeconds) else {
             let seconds = input.pausedSeconds
@@ -113,128 +103,30 @@ enum LiveReconstructionGenerator {
         }
 
         guard let poseSample else {
-            // No body detected at all in this frame — nothing to classify grips/feet against
-            // (classification needs real wrist/ankle world positions). `poseError` above already
-            // tells the coach to try a different moment. Still a normal `Result`, not a throw — the
-            // camera transform/depth above are real and usable for a wall-only view.
+            // No body detected at all in this frame. `poseError` above already tells the coach to
+            // try a different moment. Still a normal `Result`, not a throw — the camera
+            // transform/depth above are real and usable for a wall-only view.
             return Result(
                 cameraTransform: cameraTransform,
                 depthContext: depthContext,
                 poseSample: nil,
                 poseError: poseError,
-                leftGrip: nil,
-                rightGrip: nil,
-                leftFoot: nil,
-                rightFoot: nil,
-                leftGripOffsetSeconds: nil,
-                rightGripOffsetSeconds: nil,
-                leftFootOffsetSeconds: nil,
-                rightFootOffsetSeconds: nil,
                 worldPositions: nil
             )
         }
 
-        // Grip/foot-placement classification replaces raw finger/toe reconstruction here — see
-        // GripClassifier's doc comment for why. Hand landmarks (whatever Vision could detect, which
-        // is often sparse or empty on an occluded grip) are still computed as an INPUT to
-        // classification, same as before — they're just no longer rendered directly as raw fingertip
-        // geometry.
-        let mainHandSample: HandPoseSample? = depthContext.map {
-            BodyPose3DExtractor.detectHands(inVideoFrame: mainImage, context: $0)
-        }
-        let mainClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-            poseSample: poseSample,
-            cameraTransform: cameraTransform,
-            depthContext: depthContext,
-            handSample: mainHandSample,
-            handCameraTransform: cameraTransform,
-            wallReference: wallReference
-        )
-        var leftGrip = mainClassification.leftHand
-        var rightGrip = mainClassification.rightHand
-        var leftFoot = mainClassification.leftFoot
-        var rightFoot = mainClassification.rightFoot
-        var leftGripOffsetSeconds: TimeInterval?
-        var rightGripOffsetSeconds: TimeInterval?
-        var leftFootOffsetSeconds: TimeInterval?
-        var rightFootOffsetSeconds: TimeInterval?
-
-        func meets(_ c: GripClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
-        func meetsFoot(_ c: FootClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
-
-        // Same idea as the raw-hand nearby-frame fallback this replaces: a fully gripped/wedged limb
-        // is close to worst-case for classification on the EXACT paused frame, so if any slot came
-        // back low-confidence, search nearby moments in the same clip (the reach just before
-        // contact, or the release just after, are the usual candidates) for a more confident answer
-        // for THAT specific limb. Each candidate frame is analyzed (body pose + hands) ONCE and
-        // reused across all four slots, rather than re-running Vision per slot — capped at 8
-        // candidates to bound how many extra Vision calls one "Generate" tap can trigger.
-        if !meets(leftGrip) || !meets(rightGrip) || !meetsFoot(leftFoot) || !meetsFoot(rightFoot) {
-            let candidates = Array(input.frameStore.nearbyFrames(toPlaybackSeconds: input.pausedSeconds, withinSeconds: 1.5).prefix(8))
-            for candidate in candidates {
-                // Same on-demand video re-extraction as the main frame above — `candidate` no longer
-                // carries its own `capturedImage`. `playbackSeconds(forTimestamp:)` converts its raw
-                // ARKit timestamp back to a video-relative second.
-                guard let candidateSeconds = input.frameStore.playbackSeconds(forTimestamp: candidate.timestamp),
-                      let candidateImage = VideoFrameExtractor.extractFrame(from: input.videoURL, atSeconds: candidateSeconds),
-                      let candidateDepthContext = candidate.depthGroundingContext,
-                      let candidatePose = try? BodyPose3DExtractor.detect(inVideoFrame: candidateImage, deviceOrientation: candidate.deviceOrientation)
-                else { continue }
-                let candidateHands = BodyPose3DExtractor.detectHands(inVideoFrame: candidateImage, context: candidateDepthContext)
-                let candidateClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-                    poseSample: candidatePose,
-                    cameraTransform: candidate.cameraTransform,
-                    depthContext: candidateDepthContext,
-                    handSample: candidateHands,
-                    handCameraTransform: candidate.cameraTransform,
-                    wallReference: wallReference
-                )
-                let offset = candidate.timestamp - frameData.timestamp
-
-                if !meets(leftGrip), meets(candidateClassification.leftHand) {
-                    leftGrip = candidateClassification.leftHand
-                    leftGripOffsetSeconds = offset
-                }
-                if !meets(rightGrip), meets(candidateClassification.rightHand) {
-                    rightGrip = candidateClassification.rightHand
-                    rightGripOffsetSeconds = offset
-                }
-                if !meetsFoot(leftFoot), meetsFoot(candidateClassification.leftFoot) {
-                    leftFoot = candidateClassification.leftFoot
-                    leftFootOffsetSeconds = offset
-                }
-                if !meetsFoot(rightFoot), meetsFoot(candidateClassification.rightFoot) {
-                    rightFoot = candidateClassification.rightFoot
-                    rightFootOffsetSeconds = offset
-                }
-            }
-        }
-
-        let rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
+        let worldPositions = ReconstructionEntityBuilder.worldJointPositions(
             from: poseSample,
             cameraTransform: cameraTransform,
             depthContext: depthContext,
             wallReference: wallReference
         )
-        // Corrects each bone's length against the climber's Step 2 measurement, if one exists —
-        // see `CalibrationScaleCorrection`'s doc comment for why this frame's own detection has no
-        // other way to know an individual limb's proportions are off. No-ops when
-        // `calibratedSegments` is nil (Step 2 was skipped).
-        let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
 
         return Result(
             cameraTransform: cameraTransform,
             depthContext: depthContext,
             poseSample: poseSample,
             poseError: nil,
-            leftGrip: leftGrip,
-            rightGrip: rightGrip,
-            leftFoot: leftFoot,
-            rightFoot: rightFoot,
-            leftGripOffsetSeconds: leftGripOffsetSeconds,
-            rightGripOffsetSeconds: rightGripOffsetSeconds,
-            leftFootOffsetSeconds: leftFootOffsetSeconds,
-            rightFootOffsetSeconds: rightFootOffsetSeconds,
             worldPositions: worldPositions
         )
     }

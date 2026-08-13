@@ -33,17 +33,14 @@ struct SavedReconstructionReviewView: View {
             // bounding-box-based framing instead of a meaningless "camera at world origin" seed.
             cameraTransform: nil,
             depthContext: nil,
-            leftGrip: entry.leftGrip,
-            rightGrip: entry.rightGrip,
-            leftFoot: entry.leftFoot,
-            rightFoot: entry.rightFoot,
-            leftGripOffsetSeconds: entry.leftGripOffsetSeconds,
-            rightGripOffsetSeconds: entry.rightGripOffsetSeconds,
-            leftFootOffsetSeconds: entry.leftFootOffsetSeconds,
-            rightFootOffsetSeconds: entry.rightFootOffsetSeconds,
             poseError: nil,
             onBack: onClose,
             onFinished: onClose,
+            onDelete: {
+                session.removeReconstruction(id: entry.id)
+                sessionStore.save()
+                onClose()
+            },
             initialAnnotationStrokes: entry.annotationStrokes,
             onAnnotationStrokesChanged: { strokes in
                 var updated = entry
@@ -80,15 +77,7 @@ struct SavedReconstructionReviewView: View {
     let entry = ReconstructionEntry(
         timestampSeconds: 4.2,
         worldPositions: [:],
-        jointOverrides: nil,
-        leftGrip: nil,
-        rightGrip: nil,
-        leftFoot: nil,
-        rightFoot: nil,
-        leftGripOffsetSeconds: nil,
-        rightGripOffsetSeconds: nil,
-        leftFootOffsetSeconds: nil,
-        rightFootOffsetSeconds: nil
+        jointOverrides: nil
     )
     return SavedReconstructionReviewView(
         entry: entry,

@@ -2,11 +2,11 @@ import Foundation
 import SwiftData
 import simd
 
-/// One saved recording: the video file, the wall scan it was climbed against, the climber's
-/// calibration, and everything the coach marked up or generated while reviewing it — the
-/// persisted answer to "save the wall scan result, calibration data, 2D video annotation, and 3D
-/// skeleton position + annotation" (feedback item #3), owned by whichever `UserIdentity` recorded
-/// it (feedback item #4 — currently always a guest ID, see `UserIdentity`).
+/// One saved recording: the video file, the wall scan it was climbed against, and everything the
+/// coach marked up or generated while reviewing it — the persisted answer to "save the wall scan
+/// result, 2D video annotation, and 3D skeleton position + annotation" (feedback item #3), owned
+/// by whichever `UserIdentity` recorded it (feedback item #4 — currently always a guest ID, see
+/// `UserIdentity`).
 ///
 /// STORAGE CHOICE: child data (per-timestamp video annotations, per-timestamp 3D reconstructions)
 /// is stored as JSON-encoded `Data` blobs on this single model, rather than as separate `@Model`
@@ -56,9 +56,6 @@ final class RecordingSession {
     /// nil if Step 1 scanning never produced a usable reference frame for this session.
     var wallScanFolderName: String?
 
-    /// JSON-encoded `CalibrationResult`, if Step 2 calibration completed for this session.
-    var calibrationData: Data?
-
     /// JSON-encoded `[VideoAnnotationEntry]` — see the `videoAnnotations` computed accessor below.
     var videoAnnotationsData: Data
     /// JSON-encoded `[ReconstructionEntry]` — see the `reconstructions` computed accessor below.
@@ -72,8 +69,7 @@ final class RecordingSession {
         videoFileName: String,
         videoDurationSeconds: Double,
         recordingDeviceOrientationRawValue: Int,
-        wallScanFolderName: String? = nil,
-        calibrationData: Data? = nil
+        wallScanFolderName: String? = nil
     ) {
         self.id = id
         self.ownerID = ownerID
@@ -83,16 +79,8 @@ final class RecordingSession {
         self.videoDurationSeconds = videoDurationSeconds
         self.recordingDeviceOrientationRawValue = recordingDeviceOrientationRawValue
         self.wallScanFolderName = wallScanFolderName
-        self.calibrationData = calibrationData
         self.videoAnnotationsData = (try? JSONEncoder().encode([VideoAnnotationEntry]())) ?? Data()
         self.reconstructionsData = (try? JSONEncoder().encode([ReconstructionEntry]())) ?? Data()
-    }
-
-    /// Decoded calibration, if any — convenience over `calibrationData` for callers that don't
-    /// want to deal with JSON directly.
-    var calibration: CalibrationResult? {
-        get { calibrationData.flatMap { try? JSONDecoder().decode(CalibrationResult.self, from: $0) } }
-        set { calibrationData = newValue.flatMap { try? JSONEncoder().encode($0) } }
     }
 
     var videoAnnotations: [VideoAnnotationEntry] {
@@ -136,6 +124,14 @@ final class RecordingSession {
         }
         reconstructions = all
     }
+
+    /// Deletes one saved reconstruction by `id` — lets a coach clear out a specific timeframe's
+    /// generated/estimated 3D result (e.g. a bad test run) so `SessionReviewView` shows "Estimate 3D
+    /// View" / "Generate" again for that moment instead of "View 3D Reconstruction", allowing a
+    /// clean retest. No-op if `id` isn't found (already deleted, or never existed).
+    func removeReconstruction(id: UUID) {
+        reconstructions.removeAll { $0.id == id }
+    }
 }
 
 /// One paused moment's 2D screen-space markup during video playback — feedback item #1.
@@ -159,10 +155,9 @@ struct VideoAnnotationEntry: Codable, Identifiable {
 /// ever existed in memory during the original live AR session (see `RecordedFrameStore`) and was
 /// never persisted, that reconstruction is placed using Vision's own monocular estimate PLUS the
 /// wall's single archived reference camera position as a stand-in for "roughly where the camera
-/// was" — noticeably less precise than a live-grounded one, and hand-grip classification isn't
-/// attempted at all (it needs real depth-grounded hand joints), so both hands always show
-/// "uncertain." `isApproximate` is what lets the UI say so honestly rather than presenting an
-/// estimate with the same confidence as a real measurement.
+/// was" — noticeably less precise than a live-grounded one. `isApproximate` is what lets the UI
+/// say so honestly rather than presenting an estimate with the same confidence as a real
+/// measurement.
 struct ReconstructionEntry: Identifiable {
     var id: UUID = UUID()
     var timestampSeconds: Double
@@ -175,14 +170,6 @@ struct ReconstructionEntry: Identifiable {
     /// The coach's manually-dragged pose (see `SkeletonPoseEditor`), if they edited it — nil means
     /// "just show `worldPositions` as detected."
     var jointOverrides: [BodyJointName: SIMD3<Float>]?
-    var leftGrip: GripClassification?
-    var rightGrip: GripClassification?
-    var leftFoot: FootClassification?
-    var rightFoot: FootClassification?
-    var leftGripOffsetSeconds: Double?
-    var rightGripOffsetSeconds: Double?
-    var leftFootOffsetSeconds: Double?
-    var rightFootOffsetSeconds: Double?
     /// This reconstruction's own 3D-view annotations (see `ReconstructionView`'s Annotate mode) —
     /// separate from `VideoAnnotationEntry`'s 2D video-playback markup.
     var annotationStrokes: [AnnotationStroke] = []
@@ -198,8 +185,6 @@ struct ReconstructionEntry: Identifiable {
 extension ReconstructionEntry: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, timestampSeconds, worldPositions, jointOverrides
-        case leftGrip, rightGrip, leftFoot, rightFoot
-        case leftGripOffsetSeconds, rightGripOffsetSeconds, leftFootOffsetSeconds, rightFootOffsetSeconds
         case annotationStrokes, isApproximate
     }
 
@@ -209,14 +194,6 @@ extension ReconstructionEntry: Codable {
         timestampSeconds = try container.decode(Double.self, forKey: .timestampSeconds)
         worldPositions = try container.decode([BodyJointName: SIMD3<Float>].self, forKey: .worldPositions)
         jointOverrides = try container.decodeIfPresent([BodyJointName: SIMD3<Float>].self, forKey: .jointOverrides)
-        leftGrip = try container.decodeIfPresent(GripClassification.self, forKey: .leftGrip)
-        rightGrip = try container.decodeIfPresent(GripClassification.self, forKey: .rightGrip)
-        leftFoot = try container.decodeIfPresent(FootClassification.self, forKey: .leftFoot)
-        rightFoot = try container.decodeIfPresent(FootClassification.self, forKey: .rightFoot)
-        leftGripOffsetSeconds = try container.decodeIfPresent(Double.self, forKey: .leftGripOffsetSeconds)
-        rightGripOffsetSeconds = try container.decodeIfPresent(Double.self, forKey: .rightGripOffsetSeconds)
-        leftFootOffsetSeconds = try container.decodeIfPresent(Double.self, forKey: .leftFootOffsetSeconds)
-        rightFootOffsetSeconds = try container.decodeIfPresent(Double.self, forKey: .rightFootOffsetSeconds)
         annotationStrokes = try container.decodeIfPresent([AnnotationStroke].self, forKey: .annotationStrokes) ?? []
         isApproximate = try container.decodeIfPresent(Bool.self, forKey: .isApproximate) ?? false
     }
@@ -227,14 +204,6 @@ extension ReconstructionEntry: Codable {
         try container.encode(timestampSeconds, forKey: .timestampSeconds)
         try container.encode(worldPositions, forKey: .worldPositions)
         try container.encodeIfPresent(jointOverrides, forKey: .jointOverrides)
-        try container.encodeIfPresent(leftGrip, forKey: .leftGrip)
-        try container.encodeIfPresent(rightGrip, forKey: .rightGrip)
-        try container.encodeIfPresent(leftFoot, forKey: .leftFoot)
-        try container.encodeIfPresent(rightFoot, forKey: .rightFoot)
-        try container.encodeIfPresent(leftGripOffsetSeconds, forKey: .leftGripOffsetSeconds)
-        try container.encodeIfPresent(rightGripOffsetSeconds, forKey: .rightGripOffsetSeconds)
-        try container.encodeIfPresent(leftFootOffsetSeconds, forKey: .leftFootOffsetSeconds)
-        try container.encodeIfPresent(rightFootOffsetSeconds, forKey: .rightFootOffsetSeconds)
         try container.encode(annotationStrokes, forKey: .annotationStrokes)
         try container.encode(isApproximate, forKey: .isApproximate)
     }

@@ -3,7 +3,7 @@ import ARKit
 import RealityKit
 
 /// Thin SwiftUI wrapper around a RealityKit ARView (live camera passthrough), used as the live
-/// camera + mesh-wireframe viewer for Steps 1-3. It attaches to the SAME ARSession the rest of
+/// camera + mesh-wireframe viewer for the recording screen. It attaches to the SAME ARSession the rest of
 /// the app shares (via ARSessionManager) — it does not create or own its own session, and never
 /// calls `session.run(...)` itself.
 ///
@@ -16,18 +16,27 @@ import RealityKit
 /// RealityKit's `ARView` in its non-AR mode).
 struct ARMeshSceneView: UIViewRepresentable {
     let session: ARSession
+    /// Whether to render the built-in RealityKit debug wireframe over the camera feed. OFF by
+    /// default (`false`) — for an ordinary coach setting up a climb, the raw scene-reconstruction
+    /// mesh is visual clutter, not useful information; what they actually need is a plain "is my
+    /// current angle good enough" readiness cue (see `RecordingView`'s guidance
+    /// text, driven by `ARSessionManager.depthConfidenceRatio`), not a wireframe to interpret
+    /// themselves. Kept as a real toggle (not deleted) since seeing the raw mesh IS genuinely
+    /// useful for a developer checking how well the mesh is holding up against a real wall — see
+    /// `MeshToggleButton`/`DeveloperSettings.showMesh` for how a coach or developer flips this on.
+    var showMesh: Bool = false
 
     func makeUIView(context: Context) -> ARView {
         let view = ARView(frame: .zero, cameraMode: .ar, automaticallyConfigureSession: false)
         view.session = session
-        // Built-in RealityKit debug overlay: renders the live scene-reconstruction mesh as a
-        // wireframe over the camera feed. This is the "visible scan progress" cue for Step 1 —
-        // deliberately not building a custom mesh renderer for this MVP.
-        view.debugOptions = [.showSceneUnderstanding]
+        view.debugOptions = showMesh ? [.showSceneUnderstanding] : []
         return view
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
-        // Session lifecycle is owned by ARSessionManager; nothing to push per SwiftUI refresh.
+        // Session lifecycle is owned by ARSessionManager; `debugOptions` is the one thing this
+        // view needs to react to live, since `MeshToggleButton` can flip `showMesh` at any time
+        // while this screen is already on-screen.
+        uiView.debugOptions = showMesh ? [.showSceneUnderstanding] : []
     }
 }

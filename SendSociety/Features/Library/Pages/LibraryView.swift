@@ -100,7 +100,7 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
             Text("No recordings yet")
                 .font(.title2.bold())
-            Text("Tap New Recording to scan a wall, calibrate a climber, and capture your first climb.")
+            Text("Tap New Recording to capture your first climb.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)

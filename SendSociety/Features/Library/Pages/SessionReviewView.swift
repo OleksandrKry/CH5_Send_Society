@@ -34,6 +34,29 @@ struct SessionReviewView: View {
     @State private var reviewingEntry: ReconstructionEntry?
     @State private var isGeneratingEstimate = false
     @State private var estimateError: String?
+    /// Set while confirming a delete of `nearbyEntry` — a separate `@State` rather than reusing
+    /// `reviewingEntry` so the confirmation can't accidentally trigger from an unrelated sheet
+    /// presentation. Deletion is destructive/unrecoverable (overwrites the saved JSON blob), so
+    /// this always goes through `.confirmationDialog` rather than deleting on first tap.
+    @State private var pendingDeleteEntry: ReconstructionEntry?
+    /// True while "Preview Skeleton" is toggled on — see `refreshSkeletonPreview()` and
+    /// `skeletonPreview`'s doc comment for how this lets a coach sanity-check a backend's raw
+    /// detection on the current paused frame before committing to Estimate/Generate 3D.
+    @State private var isPreviewingSkeleton = false
+    @State private var skeletonPreview: SkeletonPreviewResult?
+    @State private var isLoadingSkeletonPreview = false
+    @State private var skeletonPreviewError: String?
+
+    /// One "Preview Skeleton" result: the exact raw frame that was analyzed, plus whatever 2D
+    /// joint points Vision found in it (empty, not nil, when the frame read fine but no person
+    /// was detected — see `SkeletonImageOverlayView`'s doc comment for why that's still a useful,
+    /// honest answer to show). `timestampSeconds` lets `refreshSkeletonPreview()` skip redundant
+    /// re-detection only when the paused position hasn't actually changed.
+    private struct SkeletonPreviewResult {
+        let image: CGImage
+        let points: [BodyJointName: CGPoint]
+        let timestampSeconds: Double
+    }
 
     init(session: RecordingSession, sessionStore: SessionStore, onClose: @escaping () -> Void) {
         self.session = session
@@ -61,7 +84,41 @@ struct SessionReviewView: View {
             .padding()
 
             ZStack {
-                VideoPlayer(player: model.player)
+                // Skeleton preview REPLACES the live player (rather than overlaying on top of
+                // it) while active — both the still frame and the projected points come from the
+                // exact same extracted `CGImage`, so they're guaranteed pixel-aligned; overlaying
+                // on top of the separately-rendered live `VideoPlayer` instead could only ever be
+                // "close" (different rendering/letterboxing pipeline), which would undermine the
+                // entire point of a "does this actually look right" sanity check.
+                if isPreviewingSkeleton, !model.isPlaying, let skeletonPreview {
+                    SkeletonImageOverlayView(
+                        cgImage: skeletonPreview.image,
+                        points: skeletonPreview.points,
+                        deviceOrientation: UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
+                    )
+                } else {
+                    VideoPlayer(player: model.player)
+                }
+                if isPreviewingSkeleton, !model.isPlaying, isLoadingSkeletonPreview {
+                    ProgressView("Detecting pose…")
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+                if isPreviewingSkeleton, !model.isPlaying, let skeletonPreviewError {
+                    Text(skeletonPreviewError)
+                        .font(.caption)
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                } else if isPreviewingSkeleton, !model.isPlaying, let skeletonPreview, skeletonPreview.points.isEmpty, !isLoadingSkeletonPreview {
+                    VStack {
+                        Spacer()
+                        Text("No person detected in this frame.")
+                            .font(.caption)
+                            .padding(8)
+                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 8))
+                            .padding(.bottom, 8)
+                    }
+                }
                 if isAnnotating {
                     AnnotationOverlay(state: annotationState)
                     if !model.isPlaying {
@@ -93,6 +150,15 @@ struct SessionReviewView: View {
                     Spacer()
                     if !model.isPlaying {
                         Button {
+                            isPreviewingSkeleton.toggle()
+                            if isPreviewingSkeleton { refreshSkeletonPreview() }
+                        } label: {
+                            Label("Preview Skeleton", systemImage: "figure.walk")
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(isPreviewingSkeleton ? .green : nil)
+                        .font(.footnote)
+                        Button {
                             isAnnotating.toggle()
                         } label: {
                             Label("Annotate", systemImage: "pencil.tip")
@@ -119,6 +185,13 @@ struct SessionReviewView: View {
         .onChange(of: model.isPlaying) { _, isPlaying in
             if !isPlaying { loadAnnotationsForCurrentTime() }
         }
+        .onChange(of: model.currentTime) { _, _ in
+            // Fires ~30x/sec during actual playback too (see `PlaybackModel.currentTime`'s doc
+            // comment) — `refreshSkeletonPreview()` bails immediately in that case, so this is a
+            // cheap no-op except right after a scrub/seek while paused, which is exactly when a
+            // stale preview needs refreshing.
+            refreshSkeletonPreview()
+        }
         .onChange(of: annotationState.strokes) { _, newValue in
             session.setVideoAnnotation(timestampSeconds: annotatedTimestamp, strokes: newValue)
             sessionStore.save()
@@ -143,15 +216,51 @@ struct SessionReviewView: View {
     @ViewBuilder
     private var reconstructionAction: some View {
         if let nearbyEntry {
-            Button {
-                reviewingEntry = nearbyEntry
-            } label: {
-                Text("View 3D Reconstruction")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
-                    .foregroundStyle(.white)
+            HStack(spacing: 8) {
+                Button {
+                    reviewingEntry = nearbyEntry
+                } label: {
+                    Text("View 3D Reconstruction")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.white)
+                }
+                // Lets a coach clear out a bad/test generation for this exact moment without
+                // opening the full 3D view first — tapping this shows "Estimate 3D View" (or,
+                // once Step 4's live Generate flow is reopened for the same session, "Generate")
+                // again for a clean retest, instead of a stuck "View 3D Reconstruction".
+                Button(role: .destructive) {
+                    pendingDeleteEntry = nearbyEntry
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.headline)
+                        .padding()
+                        .background(Color.red.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                        .foregroundStyle(.red)
+                }
+            }
+            .confirmationDialog(
+                "Delete this 3D reconstruction?",
+                isPresented: Binding(
+                    get: { pendingDeleteEntry != nil },
+                    set: { if !$0 { pendingDeleteEntry = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let pendingDeleteEntry {
+                        session.removeReconstruction(id: pendingDeleteEntry.id)
+                        sessionStore.save()
+                    }
+                    pendingDeleteEntry = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingDeleteEntry = nil
+                }
+            } message: {
+                Text("This removes the saved 3D position for this moment so you can generate it again. This can't be undone.")
             }
         } else if isGeneratingEstimate {
             HStack {
@@ -173,7 +282,7 @@ struct SessionReviewView: View {
                         .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(.white)
                 }
-                Text("No LiDAR depth for this moment — this uses Vision's own estimate instead of a precise measurement, and won't classify hand grips.")
+                Text("No LiDAR depth for this moment — this uses Vision's own estimate instead of a precise measurement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -201,10 +310,6 @@ struct SessionReviewView: View {
         // MUST be the orientation the phone was actually held in during this recording, not a
         // fixed assumption — see `ReconstructionEstimator.estimate`'s doc comment for why.
         let deviceOrientation = UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
-        // The climber's Step 2 measured limb lengths (nil if Step 2 was skipped) — this path has
-        // NO real depth at all, so it's the most likely to need this correction. See
-        // `CalibrationScaleCorrection`'s doc comment.
-        let calibratedSegments = session.calibration?.segments
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -212,8 +317,7 @@ struct SessionReviewView: View {
                     videoURL: url,
                     atSeconds: timestamp,
                     deviceOrientation: deviceOrientation,
-                    wallReference: reference,
-                    calibratedSegments: calibratedSegments
+                    wallReference: reference
                 )
                 DispatchQueue.main.async {
                     session.upsertReconstruction(entry)
@@ -230,6 +334,76 @@ struct SessionReviewView: View {
                 DispatchQueue.main.async {
                     isGeneratingEstimate = false
                     estimateError = "Couldn't read a frame from the video at this moment."
+                }
+            }
+        }
+    }
+
+    /// Pulls the current paused frame and runs Vision on it fresh, purely to draw a 2D skeleton
+    /// overlay for a sanity check — completely separate from `generateEstimate()`, which builds a
+    /// real, saved `ReconstructionEntry`. Nothing here is saved; this is disposable, look-then-
+    /// discard feedback for deciding whether a moment is even worth spending an Estimate/Generate
+    /// 3D on. Runs off the main thread since frame extraction + Vision can take a noticeable
+    /// moment, same as `generateEstimate()`.
+    private func refreshSkeletonPreview() {
+        guard isPreviewingSkeleton, !model.isPlaying else { return }
+        let timestamp = model.currentTime
+        // Already showing exactly this moment — nothing changed, skip the redundant re-detection
+        // (this handler also fires on unrelated `currentTime` jitter from `PlaybackModel`'s
+        // periodic time observer settling right after a seek).
+        if let skeletonPreview, abs(skeletonPreview.timestampSeconds - timestamp) < 0.05 { return }
+
+        guard let reference = wallTextureReference else {
+            skeletonPreviewError = "No wall scan camera data saved for this session — can't place the skeleton preview."
+            skeletonPreview = nil
+            return
+        }
+
+        isLoadingSkeletonPreview = true
+        skeletonPreviewError = nil
+        let url = videoURL
+        // Same reasoning as `generateEstimate()`: MUST be this recording's own saved orientation,
+        // not a live/current read — see `ReconstructionEstimator.estimate`'s doc comment.
+        let deviceOrientation = UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
+        let intrinsics = reference.intrinsics
+        let imageResolution = reference.imageResolution
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let cgImage = VideoFrameExtractor.extractFrame(from: url, atSeconds: timestamp) else {
+                DispatchQueue.main.async {
+                    isLoadingSkeletonPreview = false
+                    skeletonPreviewError = "Couldn't read a frame from the video at this moment."
+                    skeletonPreview = nil
+                }
+                return
+            }
+            var points: [BodyJointName: CGPoint] = [:]
+            // Only a genuine "no person in this frame" result is treated as the honest, silent
+            // empty-points answer (same as `ReconstructionEstimator.estimate`'s wall-only-entry
+            // handling) — anything else (model load failure/timeout, etc.) gets surfaced directly
+            // in `skeletonPreviewError` instead of silently reading as "no person detected," which
+            // would be misleading to debug against.
+            var detectionErrorMessage: String?
+            do {
+                let sample = try BodyPose3DExtractor.detect(inVideoFrame: cgImage, deviceOrientation: deviceOrientation)
+                points = BodyPose3DExtractor.projected2DImagePoints(
+                    from: sample,
+                    intrinsics: intrinsics,
+                    imageResolution: imageResolution,
+                    deviceOrientation: deviceOrientation
+                )
+            } catch BodyPoseError.noPersonDetected {
+                // Honest empty result — nothing to surface.
+            } catch {
+                detectionErrorMessage = "Vision detection failed: \(error.localizedDescription)"
+            }
+            DispatchQueue.main.async {
+                isLoadingSkeletonPreview = false
+                if let detectionErrorMessage {
+                    skeletonPreviewError = detectionErrorMessage
+                    skeletonPreview = nil
+                } else {
+                    skeletonPreview = SkeletonPreviewResult(image: cgImage, points: points, timestampSeconds: timestamp)
                 }
             }
         }

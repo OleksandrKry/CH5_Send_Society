@@ -27,11 +27,11 @@ final class SessionStore: ObservableObject {
     /// Creates and saves a new `RecordingSession` from a just-completed recording. `videoTempURL`
     /// is wherever `VideoRecorder` wrote the file (its temporary-directory output) — this copies it
     /// into permanent storage itself, so callers don't need to know about `SessionFileStore`.
-    /// `wallTextureReference`/`calibration` are optional since a session is still worth saving even
-    /// if, say, calibration was skipped or Step 1 never captured a usable reference frame.
+    /// `wallTextureReference` is optional since a session is still worth saving even if Step 1
+    /// never captured a usable reference frame.
     ///
     /// THROWS instead of returning nil on failure — see `SessionFileStore.moveVideoIntoPermanentStorage`'s
-    /// doc comment for why: a silent failure here previously meant the entire 4-step recording flow
+    /// doc comment for why: a silent failure here previously meant the entire recording flow
     /// would complete normally and return to an empty Library list with zero on-screen indication
     /// anything had gone wrong. Callers should catch this and show the coach something readable.
     @discardableResult
@@ -40,8 +40,7 @@ final class SessionStore: ObservableObject {
         videoTempURL: URL,
         videoDurationSeconds: Double,
         recordingDeviceOrientationRawValue: Int,
-        wallTextureReference: ARSessionManager.WallTextureReference?,
-        calibration: CalibrationResult?
+        wallTextureReference: ARSessionManager.WallTextureReference?
     ) throws -> RecordingSession {
         let videoFileName = try SessionFileStore.moveVideoIntoPermanentStorage(from: videoTempURL)
 
@@ -54,15 +53,13 @@ final class SessionStore: ObservableObject {
             }
         }
 
-        let calibrationData = calibration.flatMap { try? JSONEncoder().encode($0) }
         let session = RecordingSession(
             ownerID: UserIdentity.current.id,
             title: title,
             videoFileName: videoFileName,
             videoDurationSeconds: videoDurationSeconds,
             recordingDeviceOrientationRawValue: recordingDeviceOrientationRawValue,
-            wallScanFolderName: wallScanFolderName,
-            calibrationData: calibrationData
+            wallScanFolderName: wallScanFolderName
         )
         modelContext.insert(session)
         do {
