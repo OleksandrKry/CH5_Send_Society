@@ -111,16 +111,6 @@ final class RecordedFrameStore {
         sortedTimestamps.append(frame.timestamp)
     }
 
-    /// Converts a stored frame's raw ARKit session timestamp back into "seconds into the video"
-    /// (the inverse of `nearestFrame`/`nearbyFrames`'s `start + playbackSeconds` math) — needed by
-    /// callers that want to re-extract that exact frame's color image from the saved video file via
-    /// `VideoFrameExtractor` (see this class's doc comment for why `capturedImage` itself isn't
-    /// stored here anymore). Returns nil if recording never started.
-    func playbackSeconds(forTimestamp timestamp: TimeInterval) -> TimeInterval? {
-        guard let start = recordingStartTimestamp else { return nil }
-        return timestamp - start
-    }
-
     /// Finds the stored frame closest to `playbackSeconds` into the clip (0 = first recorded
     /// frame). Logs the lookup delta so association drift is visible during device testing
     /// (success criterion #3).
@@ -142,19 +132,5 @@ final class RecordedFrameStore {
             DebugLog.recording.error("Frame lookup delta exceeds 100ms — depth/video association may be visibly off")
         }
         return framesByTimestamp[closest]
-    }
-
-    /// All stored frames within `windowSeconds` of `playbackSeconds`, sorted nearest-first — used
-    /// by Step 4's hand-detection fallback (see `ReconstructionHost.generate()`) to search nearby
-    /// moments in the SAME clip when the exact paused frame's hands can't be detected (e.g. mid-
-    /// grip, occluded by the hold). Does NOT include the exact frame at `playbackSeconds` itself —
-    /// callers already have that one from `nearestFrame`.
-    func nearbyFrames(toPlaybackSeconds playbackSeconds: TimeInterval, withinSeconds windowSeconds: TimeInterval) -> [RecordedFrameData] {
-        guard let start = recordingStartTimestamp else { return [] }
-        let target = start + playbackSeconds
-        return sortedTimestamps
-            .filter { abs($0 - target) <= windowSeconds }
-            .sorted { abs($0 - target) < abs($1 - target) }
-            .compactMap { framesByTimestamp[$0] }
     }
 }

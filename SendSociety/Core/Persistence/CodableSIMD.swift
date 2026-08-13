@@ -3,8 +3,8 @@ import simd
 /// Retroactive `Codable` conformance for the simd types this app already uses everywhere
 /// (`SIMD3<Float>` joint positions, `simd_float4x4` camera transforms, etc.). None of Apple's simd
 /// types conform to `Codable` out of the box, so every persisted struct that contains one — nearly
-/// every domain model in this app (`BodyPoseSample`, `CalibrationResult`, `GripClassification`,
-/// and so on) — needs this before Swift's automatic `Codable` synthesis can work for it. Adding it
+/// every domain model in this app (`BodyPoseSample`, `ReconstructionEntry`, and so on) — needs
+/// this before Swift's automatic `Codable` synthesis can work for it. Adding it
 /// ONCE here, centrally, means those domain structs just need a plain `: Codable` added to their
 /// declaration with no other changes — see the individual `extension ... : Codable {}` lines
 /// scattered across the domain model files for where that happens.

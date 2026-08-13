@@ -14,10 +14,6 @@ struct ReconstructionSceneView: UIViewRepresentable {
     let poseSample: BodyPoseSample?
     let cameraTransform: simd_float4x4?
     let depthContext: BodyPose3DExtractor.DepthGroundingContext?
-    let leftGrip: GripClassification?
-    let rightGrip: GripClassification?
-    let leftFoot: FootClassification?
-    let rightFoot: FootClassification?
     /// When true, a one-finger drag on a joint moves it (see `Coordinator`'s hit-testing); when
     /// false, one-finger drag always orbits, exactly as before this feature existed.
     let isEditingPose: Bool
@@ -418,10 +414,6 @@ struct ReconstructionSceneView: UIViewRepresentable {
                 cameraTransform: parent.cameraTransform ?? matrix_identity_float4x4,
                 depthContext: parent.depthContext,
                 wallReference: parent.wallTextureReference,
-                leftGrip: parent.leftGrip,
-                rightGrip: parent.rightGrip,
-                leftFoot: parent.leftFoot,
-                rightFoot: parent.rightFoot,
                 overridePositions: currentPositions,
                 highlightedJoints: highlighted?.joints ?? [],
                 highlightedBones: highlighted?.bones ?? [],

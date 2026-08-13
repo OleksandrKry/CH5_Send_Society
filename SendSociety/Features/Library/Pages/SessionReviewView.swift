@@ -282,7 +282,7 @@ struct SessionReviewView: View {
                         .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                         .foregroundStyle(.white)
                 }
-                Text("No LiDAR depth for this moment — this uses Vision's own estimate instead of a precise measurement, and won't classify hand grips.")
+                Text("No LiDAR depth for this moment — this uses Vision's own estimate instead of a precise measurement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -310,10 +310,6 @@ struct SessionReviewView: View {
         // MUST be the orientation the phone was actually held in during this recording, not a
         // fixed assumption — see `ReconstructionEstimator.estimate`'s doc comment for why.
         let deviceOrientation = UIDeviceOrientation(rawValue: session.recordingDeviceOrientationRawValue) ?? .portrait
-        // The climber's Step 2 measured limb lengths (nil if Step 2 was skipped) — this path has
-        // NO real depth at all, so it's the most likely to need this correction. See
-        // `CalibrationScaleCorrection`'s doc comment.
-        let calibratedSegments = session.calibration?.segments
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
@@ -321,8 +317,7 @@ struct SessionReviewView: View {
                     videoURL: url,
                     atSeconds: timestamp,
                     deviceOrientation: deviceOrientation,
-                    wallReference: reference,
-                    calibratedSegments: calibratedSegments
+                    wallReference: reference
                 )
                 DispatchQueue.main.async {
                     session.upsertReconstruction(entry)

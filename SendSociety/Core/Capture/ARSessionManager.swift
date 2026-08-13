@@ -5,7 +5,7 @@ import UIKit
 
 /// CAPTURE MODULE: everything in `Core/Capture/` is about getting real-world data IN — the live
 /// ARSession, camera frames, depth, and the recorded video file. Nothing in this folder knows
-/// about Vision body-pose detection, grip/foot classification, or RealityKit rendering (that's
+/// about Vision body-pose detection or RealityKit rendering (that's
 /// `Core/Reconstruction/`) or how a session gets saved to disk (that's `Core/Persistence/`).
 /// `ARSessionManager` is this module's main entry point — most other modules only ever need it
 /// (and its `WallTextureReference`) or `VideoRecorder`/`RecordedFrameStore`, not the smaller
@@ -55,15 +55,14 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     /// `captureWallTextureReference()`). Step 4 renders THIS, not the live `meshAnchors`.
     ///
     /// Why this exists: the ARSession keeps running (and scene reconstruction keeps growing/
-    /// updating mesh anchors) through Steps 2 and 3, per the brief's one-continuous-session
+    /// updating mesh anchors) through the recording step, per the brief's one-continuous-session
     /// requirement. ARKit's mesh reconstruction meshes whatever the LiDAR sees — including the
-    /// climber's own body while they stand in front of the wall for calibration and the climb —
-    /// and it's slow to prune stale geometry once a person moves. Left live, Step 4's "wall"
-    /// picks up floor slivers, room clutter caught at the edge of frame, and leftover blob
-    /// geometry shaped like wherever the climber's body sat during Steps 2-3 — which is almost
-    /// certainly what shows up as unexplained mesh far from the actual wall, and as the
-    /// skeleton appearing to be embedded IN the wall (it's actually sitting inside a residual
-    /// body-shaped mesh chunk, textured like the wall, at the same spot).
+    /// climber's own body while they climb — and it's slow to prune stale geometry once a person
+    /// moves. Left live, Step 4's "wall" picks up floor slivers, room clutter caught at the edge
+    /// of frame, and leftover blob geometry shaped like wherever the climber's body sat during
+    /// recording — which is almost certainly what shows up as unexplained mesh far from the
+    /// actual wall, and as the skeleton appearing to be embedded IN the wall (it's actually
+    /// sitting inside a residual body-shaped mesh chunk, textured like the wall, at the same spot).
     @Published private(set) var wallMeshSnapshot: [ARMeshAnchor] = []
 
     /// Low-level hook invoked synchronously on every frame update, used by Step 3 recording to

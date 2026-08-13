@@ -5,8 +5,8 @@ import UIKit
 import CoreImage
 
 /// POSE-RECONSTRUCTION MODULE (the app's "core function"): everything in `Core/PoseReconstruction/`
-/// is the actual climbing-analysis algorithm — Vision body/hand detection, LiDAR grounding,
-/// grip/foot classification, manual-pose-edit constraints, and turning all of that into renderable
+/// is the actual climbing-analysis algorithm — Vision body detection, LiDAR grounding,
+/// manual-pose-edit constraints, and turning all of that into renderable
 /// RealityKit geometry. Nothing in this folder is SwiftUI; it takes plain data in (joint samples,
 /// camera transforms, depth buffers) and hands plain data or RealityKit entities back out.
 ///
@@ -35,8 +35,8 @@ enum ReconstructionEntityBuilder {
     }
 
     /// Parses an `Entity.name` produced by `jointEntityName(for:)` back into a `BodyJointName` —
-    /// nil for any entity that isn't a joint sphere (the wall, bones, hand/foot presets, etc. all
-    /// have different names).
+    /// nil for any entity that isn't a joint sphere (the wall, bones, etc. all have different
+    /// names).
     static func jointName(fromEntityName entityName: String) -> BodyJointName? {
         guard entityName.hasPrefix(jointEntityNamePrefix) else { return nil }
         return BodyJointName(rawValue: String(entityName.dropFirst(jointEntityNamePrefix.count)))
@@ -572,61 +572,6 @@ enum ReconstructionEntityBuilder {
         return corrected
     }
 
-    /// Runs grip/foot-placement classification for both hands and both feet against a single
-    /// frame's already-grounded skeleton + hand data — see `GripClassifier` for the classification
-    /// logic and why it exists at all instead of raw finger/toe reconstruction. Exposed separately
-    /// from `skeletonEntity` (not buried inside it) so `ContentView.ReconstructionHost`'s
-    /// nearby-frame fallback can run this same classification against CANDIDATE frames too, not
-    /// just the one that ends up rendered — mirroring the existing raw-hand-detection fallback
-    /// pattern.
-    static func classifyGripsAndFeet(
-        poseSample: BodyPoseSample,
-        cameraTransform: simd_float4x4,
-        depthContext: BodyPose3DExtractor.DepthGroundingContext?,
-        handSample: HandPoseSample?,
-        handCameraTransform: simd_float4x4?,
-        wallReference: ARSessionManager.WallTextureReference?
-    ) -> (leftHand: GripClassification?, rightHand: GripClassification?, leftFoot: FootClassification?, rightFoot: FootClassification?) {
-        let worldPositions = worldJointPositions(from: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, wallReference: wallReference)
-        let wallNormal = wallReference.flatMap { wallPlane(from: $0)?.normal }
-
-        func handWorldJoints(_ cameraSpace: [HandJointName: SIMD3<Float>]) -> [HandJointName: SIMD3<Float>] {
-            guard !cameraSpace.isEmpty else { return [:] }
-            let transform = handCameraTransform ?? cameraTransform
-            var out: [HandJointName: SIMD3<Float>] = [:]
-            for (joint, cs) in cameraSpace {
-                out[joint] = BodyPose3DExtractor.worldPosition(cameraSpace: cs, cameraTransform: transform)
-            }
-            return out
-        }
-
-        var leftHand: GripClassification?
-        var rightHand: GripClassification?
-        if let handSample {
-            if let leftWrist = worldPositions[.leftWrist] {
-                let forearm = worldPositions[.leftElbow].map { leftWrist - $0 }
-                leftHand = GripClassifier.classifyHand(joints: handWorldJoints(handSample.leftHandJoints), wristWorld: leftWrist, forearmDirection: forearm, wallNormal: wallNormal)
-            }
-            if let rightWrist = worldPositions[.rightWrist] {
-                let forearm = worldPositions[.rightElbow].map { rightWrist - $0 }
-                rightHand = GripClassifier.classifyHand(joints: handWorldJoints(handSample.rightHandJoints), wristWorld: rightWrist, forearmDirection: forearm, wallNormal: wallNormal)
-            }
-        }
-
-        var leftFoot: FootClassification?
-        var rightFoot: FootClassification?
-        if let leftAnkle = worldPositions[.leftAnkle] {
-            let shin = worldPositions[.leftKnee].map { leftAnkle - $0 }
-            leftFoot = GripClassifier.classifyFoot(ankleWorld: leftAnkle, hipWorld: worldPositions[.leftHip], shinDirection: shin, wallNormal: wallNormal)
-        }
-        if let rightAnkle = worldPositions[.rightAnkle] {
-            let shin = worldPositions[.rightKnee].map { rightAnkle - $0 }
-            rightFoot = GripClassifier.classifyFoot(ankleWorld: rightAnkle, hipWorld: worldPositions[.rightHip], shinDirection: shin, wallNormal: wallNormal)
-        }
-
-        return (leftHand, rightHand, leftFoot, rightFoot)
-    }
-
     static func skeletonEntity(
         /// Optional (unlike `worldJointPositions`'s required `sample`) so a saved session review
         /// can render a previously-generated reconstruction via `overridePositions` alone, without
@@ -638,10 +583,6 @@ enum ReconstructionEntityBuilder {
         cameraTransform: simd_float4x4,
         depthContext: BodyPose3DExtractor.DepthGroundingContext? = nil,
         wallReference: ARSessionManager.WallTextureReference? = nil,
-        leftGrip: GripClassification? = nil,
-        rightGrip: GripClassification? = nil,
-        leftFoot: FootClassification? = nil,
-        rightFoot: FootClassification? = nil,
         /// When present, used INSTEAD of the auto-detected/grounded positions below — the coach's
         /// manually-dragged pose (see `SkeletonPoseEditor`). Passing nil (the default) preserves
         /// the original auto-only behavior exactly.
@@ -653,8 +594,7 @@ enum ReconstructionEntityBuilder {
         highlightedBones: Set<SkeletonBone> = [],
         /// True while the coach is in pose-editing mode — skips the mannequin body wrapper so the
         /// bare yellow joints/red bones are fully exposed and easy to grab, instead of being
-        /// partly buried inside the (visually larger) mannequin capsules. Hand/foot presets still
-        /// render, since those attach at the wrist/ankle rather than needing to be tapped directly.
+        /// partly buried inside the (visually larger) mannequin capsules.
         hideMannequinBody: Bool = false
     ) -> Entity {
         let root = Entity()
@@ -676,10 +616,8 @@ enum ReconstructionEntityBuilder {
 
         // Mannequin body: a rough capsule "wrapper" around each bone, sized per body part, so the
         // coach sees an actual humanoid volume instead of a bare stick figure. Purely a visual
-        // approximation — capsule radii are fixed anatomical guesses, NOT measured from this
-        // specific climber (Step 2 calibration's segment LENGTHS already flow into joint spacing;
-        // there's no equivalent measured girth/thickness to draw on). Skipped in pose-editing mode
-        // — see `hideMannequinBody`'s doc comment.
+        // approximation — capsule radii are fixed anatomical guesses, not measured from this
+        // specific climber. Skipped in pose-editing mode — see `hideMannequinBody`'s doc comment.
         if !hideMannequinBody {
             for bone in skeletonBones {
                 guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
@@ -725,31 +663,6 @@ enum ReconstructionEntityBuilder {
             }
         }
 
-        // Hand/finger and foot/toe detail: classify-then-snap-to-preset instead of raw depth
-        // reconstruction — see `GripClassifier`'s doc comment for the full reasoning (LiDAR's
-        // ~1-3cm accuracy is close to finger/edge scale, and a gripping hand or wedged foot is
-        // close to worst-case occlusion). `worldPositions` above already has the real, reliably
-        // grounded wrist/ankle anchor points — only the SHAPE attached there is a preset, not the
-        // anchor point itself. A nil-or-low-confidence classification renders an honest
-        // "uncertain" marker instead of a named preset — see `handAttachmentEntity`.
-        let wallNormal = wallReference.flatMap { wallPlane(from: $0)?.normal }
-        if let leftWrist = worldPositions[.leftWrist] {
-            let forearm = worldPositions[.leftElbow].map { leftWrist - $0 }
-            root.addChild(handAttachmentEntity(classification: leftGrip, wristWorld: leftWrist, forearmDirection: forearm, wallNormal: wallNormal))
-        }
-        if let rightWrist = worldPositions[.rightWrist] {
-            let forearm = worldPositions[.rightElbow].map { rightWrist - $0 }
-            root.addChild(handAttachmentEntity(classification: rightGrip, wristWorld: rightWrist, forearmDirection: forearm, wallNormal: wallNormal))
-        }
-        if let leftAnkle = worldPositions[.leftAnkle] {
-            let shin = worldPositions[.leftKnee].map { leftAnkle - $0 }
-            root.addChild(footAttachmentEntity(classification: leftFoot, ankleWorld: leftAnkle, shinDirection: shin, wallNormal: wallNormal))
-        }
-        if let rightAnkle = worldPositions[.rightAnkle] {
-            let shin = worldPositions[.rightKnee].map { rightAnkle - $0 }
-            root.addChild(footAttachmentEntity(classification: rightFoot, ankleWorld: rightAnkle, shinDirection: shin, wallNormal: wallNormal))
-        }
-
         DebugLog.reconstruction.info("Skeleton entity built with \(worldPositions.count, privacy: .public)/17 joints resolved")
         return root
     }
@@ -790,129 +703,6 @@ enum ReconstructionEntityBuilder {
             maxRadius = max(maxRadius, mannequinRadius(for: bone))
         }
         return maxRadius
-    }
-
-    /// Attaches either a classified preset grip pose or an honest "uncertain" marker at a wrist
-    /// position — see `GripClassifier`'s doc comment for why raw finger reconstruction isn't
-    /// attempted. A nil classification (couldn't even attempt one, e.g. near-zero hand landmarks
-    /// detected on a fully occluded grip) is treated identically to a low-confidence one: both
-    /// show the same neutral marker rather than a guessed label, per the feature's required
-    /// fallback behavior ("a visible not-confident beats a silently/confidently wrong answer").
-    private static func handAttachmentEntity(
-        classification: GripClassification?,
-        wristWorld: SIMD3<Float>,
-        forearmDirection: SIMD3<Float>?,
-        wallNormal: SIMD3<Float>?
-    ) -> Entity {
-        guard let classification, classification.confidence >= GripClassifier.confidenceThreshold else {
-            return uncertainMarkerEntity(at: wristWorld)
-        }
-        let layout = PresetPoseLibrary.handJointLayout(for: classification.type)
-        let orientation = presetOrientation(primaryDirection: forearmDirection, secondaryFacingReference: wallNormal.map { -$0 })
-        let presetJointMaterial = UnlitMaterial(color: .systemTeal)
-        let presetBoneMaterial = UnlitMaterial(color: UIColor.systemTeal.withAlphaComponent(0.8))
-
-        let root = Entity()
-        var worldJoints: [HandJointName: SIMD3<Float>] = [:]
-        for (joint, local) in layout {
-            worldJoints[joint] = wristWorld + orientation.act(local)
-        }
-        for (joint, position) in worldJoints {
-            let sphere = ModelEntity(mesh: .generateSphere(radius: 0.007), materials: [presetJointMaterial])
-            sphere.position = position
-            sphere.name = "presetHand.\(joint.rawValue)"
-            root.addChild(sphere)
-        }
-        for bone in handBones {
-            guard let a = worldJoints[bone.from], let b = worldJoints[bone.to] else { continue }
-            if let boneEntity = cylinderBetween(a, b, radius: 0.005, material: presetBoneMaterial) {
-                root.addChild(boneEntity)
-            }
-        }
-        return root
-    }
-
-    /// Same idea as `handAttachmentEntity`, for a schematic climbing-shoe box at an ankle
-    /// position instead of a hand joint layout.
-    private static func footAttachmentEntity(
-        classification: FootClassification?,
-        ankleWorld: SIMD3<Float>,
-        shinDirection: SIMD3<Float>?,
-        wallNormal: SIMD3<Float>?
-    ) -> Entity {
-        guard let classification, classification.confidence >= GripClassifier.confidenceThreshold else {
-            return uncertainMarkerEntity(at: ankleWorld)
-        }
-        let shape = PresetPoseLibrary.footShape(for: classification.type)
-        let orientation = presetOrientation(primaryDirection: shinDirection, secondaryFacingReference: wallNormal.map { -$0 })
-        var material = SimpleMaterial(color: UIColor.systemTeal.withAlphaComponent(0.85), roughness: 0.6, isMetallic: false)
-        material.faceCulling = .none
-
-        let entity = ModelEntity(mesh: .generateBox(size: shape.boxSize), materials: [material])
-        entity.position = ankleWorld + orientation.act(shape.localOffset)
-        entity.orientation = orientation * shape.localRotation
-        return entity
-    }
-
-    /// Neutral "we don't have a confident answer" marker — a small translucent gray sphere plus a
-    /// floating 3D "?" — shown instead of a named preset whenever classification confidence is
-    /// too low. `MeshResource.generateText` is a real, non-throwing RealityKit API (iOS 13+); the
-    /// font "size" is interpreted as roughly the text height in METERS, not points, which is why
-    /// 0.03 (3cm) is used here rather than a normal UIFont point size — UNVERIFIED ON DEVICE, if
-    /// the "?" comes out comically large/tiny that unit assumption is the first thing to check.
-    private static func uncertainMarkerEntity(at position: SIMD3<Float>) -> Entity {
-        let root = Entity()
-        var sphereMaterial = SimpleMaterial(color: UIColor.systemGray.withAlphaComponent(0.55), roughness: 0.8, isMetallic: false)
-        sphereMaterial.faceCulling = .none
-        let sphere = ModelEntity(mesh: .generateSphere(radius: 0.028), materials: [sphereMaterial])
-        sphere.position = position
-        root.addChild(sphere)
-
-        let textMesh = MeshResource.generateText(
-            "?",
-            extrusionDepth: 0.002,
-            font: .systemFont(ofSize: 0.03)
-        )
-        let textEntity = ModelEntity(mesh: textMesh, materials: [UnlitMaterial(color: .white)])
-        textEntity.position = position + SIMD3<Float>(-0.008, 0.04, 0)
-        root.addChild(textEntity)
-        return root
-    }
-
-    /// Coarse local->world rotation for attaching a preset shape: local +Y maps onto
-    /// `primaryDirection` (forearm continuing into the hand, or shin continuing past the ankle),
-    /// using the same up-onto-direction recipe as `cylinderBetween`/`capsuleBetween` above. The
-    /// remaining twist around that axis points the preset's local +X axis as close as possible
-    /// toward `secondaryFacingReference` (e.g. "into the wall") when available. Deliberately
-    /// coarse, per the feature brief: "even an approximate [direction] is enough — do not attempt
-    /// precise rotation matching."
-    private static func presetOrientation(primaryDirection: SIMD3<Float>?, secondaryFacingReference: SIMD3<Float>?) -> simd_quatf {
-        guard let primaryDirection, simd_length(primaryDirection) > 0.0001 else {
-            return simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
-        }
-        let direction = normalize(primaryDirection)
-        let localUp = SIMD3<Float>(0, 1, 0)
-        var base = simd_quatf(angle: 0, axis: SIMD3<Float>(0, 1, 0))
-        let dot = simd_dot(localUp, direction)
-        if dot < -0.9999 {
-            base = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
-        } else if dot < 0.9999 {
-            let axis = normalize(simd_cross(localUp, direction))
-            base = simd_quatf(angle: acos(dot), axis: axis)
-        }
-        guard let secondaryFacingReference, simd_length(secondaryFacingReference) > 0.0001 else { return base }
-
-        // Twist around `direction` so the preset's local +X points as close as possible toward
-        // `secondaryFacingReference`, projected into the plane perpendicular to `direction`.
-        let currentLocalX = base.act(SIMD3<Float>(1, 0, 0))
-        let target = secondaryFacingReference - direction * simd_dot(secondaryFacingReference, direction)
-        guard simd_length(target) > 0.0001 else { return base }
-        let normalizedTarget = normalize(target)
-        let projectedCurrent = normalize(currentLocalX - direction * simd_dot(currentLocalX, direction))
-        let twistDot = min(max(simd_dot(projectedCurrent, normalizedTarget), -1), 1)
-        let twistSign: Float = simd_dot(simd_cross(projectedCurrent, normalizedTarget), direction) < 0 ? -1 : 1
-        let twist = simd_quatf(angle: acos(twistDot) * twistSign, axis: direction)
-        return twist * base
     }
 
     /// Mannequin limb segment: same rotate-a-cylinder-onto-a-direction trick as `cylinderBetween`

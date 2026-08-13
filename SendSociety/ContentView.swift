@@ -3,8 +3,8 @@ import ARKit
 import simd
 import SwiftData
 
-/// Root navigation for the 4-step MVP pipeline. Owns the single shared ARSessionManager
-/// instance for the lifetime of the app so Steps 1-3 always see the same ARSession (see
+/// Root navigation for the 3-step MVP pipeline. Owns the single shared ARSessionManager
+/// instance for the lifetime of the app so every step always sees the same ARSession (see
 /// ARSessionManager's doc comment for why this matters).
 ///
 /// This view is now only ever reached via `LibraryView`'s "New Recording" entry point, and always
@@ -14,7 +14,6 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var arManager = ARSessionManager()
     @State private var step: AppStep = .wallScan
-    @State private var calibration: CalibrationResult?
     @State private var reconstructionInput: ReconstructionInput?
 
     // Owned here (not inside RecordingView) so navigating Step 4 -> back -> Step 3 re-shows the
@@ -25,9 +24,9 @@ struct ContentView: View {
     /// Lazily constructed once `modelContext` is available (it isn't yet during `init`, since
     /// `@Environment` values aren't resolved until the view is actually part of the hierarchy).
     @State private var sessionStore: SessionStore?
-    /// The `RecordingSession` for THIS run through the pipeline, created the moment Step 3
-    /// finishes recording (as soon as there's a video + whatever wall scan/calibration data
-    /// exists to save alongside it) — see requirement #3's "every state should be saved." Every
+    /// The `RecordingSession` for THIS run through the pipeline, created the moment recording
+    /// finishes (as soon as there's a video + whatever wall scan data exists to save alongside
+    /// it) — see requirement #3's "every state should be saved." Every
     /// video annotation and 3D reconstruction made for the rest of this flow gets folded into this
     /// same session object.
     @State private var currentSession: RecordingSession?
@@ -75,11 +74,6 @@ struct ContentView: View {
         switch step {
         case .wallScan:
             WallScanView(arManager: arManager) {
-                step = .calibration
-            }
-        case .calibration:
-            CalibrationView(arManager: arManager) { result in
-                calibration = result
                 step = .recording
             }
         case .recording:
@@ -101,11 +95,11 @@ struct ContentView: View {
         }
     }
 
-    /// Saves the just-recorded video (plus whatever wall scan/calibration data exists so far) as a
+    /// Saves the just-recorded video (plus whatever wall scan data exists so far) as a
     /// new `RecordingSession` the moment recording stops — see `currentSession`'s doc comment.
-    /// Guarded so navigating back to Step 3 and stopping a re-record doesn't create a second
-    /// session for what's still conceptually the same pipeline run (a coach who genuinely wants a
-    /// separate session re-records from Library's "New Recording" instead).
+    /// Guarded so navigating back to the recording step and stopping a re-record doesn't create a
+    /// second session for what's still conceptually the same pipeline run (a coach who genuinely
+    /// wants a separate session re-records from Library's "New Recording" instead).
     private func createSessionIfNeeded(videoTempURL: URL?) {
         guard let videoTempURL, currentSession == nil, let sessionStore else { return }
         let title = "Climb — " + Date().formatted(date: .abbreviated, time: .shortened)
@@ -115,8 +109,7 @@ struct ContentView: View {
                 videoTempURL: videoTempURL,
                 videoDurationSeconds: recorder.lastRecordingDuration,
                 recordingDeviceOrientationRawValue: recorder.recordingDeviceOrientation.rawValue,
-                wallTextureReference: arManager.wallTextureReference,
-                calibration: calibration
+                wallTextureReference: arManager.wallTextureReference
             )
         } catch {
             // See `saveErrorMessage`'s doc comment — this used to fail completely silently, with
@@ -178,22 +171,6 @@ private struct ReconstructionHost: View {
     /// camera from a meaningless placeholder transform.
     @State private var recordingCameraTransform: simd_float4x4?
     @State private var depthContext: BodyPose3DExtractor.DepthGroundingContext?
-    /// Classify-then-snap-to-preset results for each limb — see `GripClassifier`. Each is
-    /// computed for the exact paused frame first; if confidence comes in below
-    /// `GripClassifier.confidenceThreshold`, `generate()`'s nearby-frame fallback (mirroring the
-    /// approach already used for raw hand-position recovery) searches nearby moments in the same
-    /// clip for a more confident answer for THAT specific limb.
-    @State private var leftGrip: GripClassification?
-    @State private var rightGrip: GripClassification?
-    @State private var leftFoot: FootClassification?
-    @State private var rightFoot: FootClassification?
-    /// Non-nil only when the corresponding classification above was recovered from a nearby frame
-    /// instead of the exact paused one — surfaced in the UI as an explicit "estimated from Xs
-    /// earlier/later" label.
-    @State private var leftGripOffsetSeconds: TimeInterval?
-    @State private var rightGripOffsetSeconds: TimeInterval?
-    @State private var leftFootOffsetSeconds: TimeInterval?
-    @State private var rightFootOffsetSeconds: TimeInterval?
     @State private var poseError: String?
     @State private var isReady = false
 
@@ -231,14 +208,6 @@ private struct ReconstructionHost: View {
                     poseSample: poseSample,
                     cameraTransform: recordingCameraTransform,
                     depthContext: depthContext,
-                    leftGrip: leftGrip,
-                    rightGrip: rightGrip,
-                    leftFoot: leftFoot,
-                    rightFoot: rightFoot,
-                    leftGripOffsetSeconds: leftGripOffsetSeconds,
-                    rightGripOffsetSeconds: rightGripOffsetSeconds,
-                    leftFootOffsetSeconds: leftFootOffsetSeconds,
-                    rightFootOffsetSeconds: rightFootOffsetSeconds,
                     poseError: poseError,
                     onBack: onBack,
                     onFinished: onFinished,
@@ -271,14 +240,6 @@ private struct ReconstructionHost: View {
             timestampSeconds: entryTimestamp,
             worldPositions: entryBaseWorldPositions,
             jointOverrides: lastJointOverrides,
-            leftGrip: leftGrip,
-            rightGrip: rightGrip,
-            leftFoot: leftFoot,
-            rightFoot: rightFoot,
-            leftGripOffsetSeconds: leftGripOffsetSeconds,
-            rightGripOffsetSeconds: rightGripOffsetSeconds,
-            leftFootOffsetSeconds: leftFootOffsetSeconds,
-            rightFootOffsetSeconds: rightFootOffsetSeconds,
             annotationStrokes: lastAnnotationStrokes
         )
         session.upsertReconstruction(entry)
@@ -301,52 +262,32 @@ private struct ReconstructionHost: View {
             lastJointOverrides = existing.jointOverrides
             initialAnnotationStrokes = existing.annotationStrokes
             lastAnnotationStrokes = existing.annotationStrokes
-            leftGrip = existing.leftGrip
-            rightGrip = existing.rightGrip
-            leftFoot = existing.leftFoot
-            rightFoot = existing.rightFoot
-            leftGripOffsetSeconds = existing.leftGripOffsetSeconds
-            rightGripOffsetSeconds = existing.rightGripOffsetSeconds
-            leftFootOffsetSeconds = existing.leftFootOffsetSeconds
-            rightFootOffsetSeconds = existing.rightFootOffsetSeconds
             loadedFromSavedEntry = true
             isReady = true
             DebugLog.reconstruction.info("Loaded saved reconstruction for t=\(existing.timestampSeconds, privacy: .public)s — skipping Vision")
             return
         }
 
-        // The actual detection/grounding/classification algorithm lives in
+        // The actual detection/grounding algorithm lives in
         // `LiveReconstructionGenerator` (Core/PoseReconstruction) — this just wires this screen's
         // input/state to it and copies the result back out. See that type's doc comment for why it
         // was pulled out of here.
         do {
-            // `session?.calibration?.segments` are the climber's Step 2 measured limb lengths
-            // (nil if Step 2 was skipped) — see `CalibrationScaleCorrection`'s doc comment for why
-            // this frame's own detection needs them to correct its bone proportions.
             let result = try LiveReconstructionGenerator.generate(
                 input: input,
-                wallReference: arManager.wallTextureReference,
-                calibratedSegments: session?.calibration?.segments
+                wallReference: arManager.wallTextureReference
             )
             cameraTransform = result.cameraTransform
-            // Separate from `cameraTransform` above (which stays non-optional and feeds
-            // classification math) — this is specifically "do we have a REAL per-frame recording
-            // transform to seed the 3D-view camera with," passed straight through to
-            // `ReconstructionView`. Only ever set here, on the fresh-detection path — stays nil for
-            // a loaded saved entry (see the early return above) or if generation threw, neither of
-            // which has a trustworthy per-frame camera pose to seed a camera from.
+            // Separate from `cameraTransform` above (which stays non-optional) — this is
+            // specifically "do we have a REAL per-frame recording transform to seed the 3D-view
+            // camera with," passed straight through to `ReconstructionView`. Only ever set here, on
+            // the fresh-detection path — stays nil for a loaded saved entry (see the early return
+            // above) or if generation threw, neither of which has a trustworthy per-frame camera
+            // pose to seed a camera from.
             recordingCameraTransform = result.cameraTransform
             depthContext = result.depthContext
             poseSample = result.poseSample
             poseError = result.poseError
-            leftGrip = result.leftGrip
-            rightGrip = result.rightGrip
-            leftFoot = result.leftFoot
-            rightFoot = result.rightFoot
-            leftGripOffsetSeconds = result.leftGripOffsetSeconds
-            rightGripOffsetSeconds = result.rightGripOffsetSeconds
-            leftFootOffsetSeconds = result.leftFootOffsetSeconds
-            rightFootOffsetSeconds = result.rightFootOffsetSeconds
 
             if let worldPositions = result.worldPositions {
                 // Freshly generated (not loaded) — save it right away, per feedback item #2's
@@ -355,11 +296,11 @@ private struct ReconstructionHost: View {
                 // is the baseline every later edit/annotation upsert writes on top of (see
                 // `upsertReconstruction()`).
                 entryBaseWorldPositions = worldPositions
-                // Render from these FINAL, calibration-retargeted positions directly, matching the
-                // loaded-saved-entry path above (`initialWorldPositions = existing.worldPositions`).
-                // The old behavior left this unset here, so `ReconstructionView` fell back to
-                // re-deriving positions from `poseSample` — which skips retargeting. See
-                // `LiveReconstructionGenerator.Result.worldPositions`'s doc comment.
+                // Render from these FINAL positions directly, matching the loaded-saved-entry path
+                // above (`initialWorldPositions = existing.worldPositions`). The old behavior left
+                // this unset here, so `ReconstructionView` fell back to re-deriving positions from
+                // `poseSample` instead. See `LiveReconstructionGenerator.Result.worldPositions`'s
+                // doc comment.
                 initialWorldPositions = worldPositions
                 upsertReconstruction()
             }

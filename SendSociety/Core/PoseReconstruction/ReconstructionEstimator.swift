@@ -32,8 +32,8 @@ enum ReconstructionEstimator {
     /// assumption — see `BodyPose3DExtractor.detect(inVideoFrame:deviceOrientation:)`'s doc comment
     /// for why getting this wrong is exactly what makes a re-generated posture face the wrong way.
     ///
-    /// Returns a full, classified entry when a climber is detected; a WALL-ONLY entry (empty
-    /// `worldPositions`, no grip/foot classification) when the frame reads fine but no body pose
+    /// Returns a full entry when a climber is detected; a WALL-ONLY entry (empty
+    /// `worldPositions`) when the frame reads fine but no body pose
     /// could be found — that's a legitimate result, not a failure, so the coach can still check
     /// wall-scan/camera-angle calibration without a person in frame (mirrors Step 4's live
     /// "Generate" behavior for the same situation). Only throws `EstimationError.couldNotReadFrame`
@@ -42,8 +42,7 @@ enum ReconstructionEstimator {
         videoURL: URL,
         atSeconds timestamp: Double,
         deviceOrientation: UIDeviceOrientation,
-        wallReference: ARSessionManager.WallTextureReference?,
-        calibratedSegments: SegmentLengths? = nil
+        wallReference: ARSessionManager.WallTextureReference?
     ) throws -> ReconstructionEntry {
         guard let cgImage = VideoFrameExtractor.extractFrame(from: videoURL, atSeconds: timestamp) else {
             throw EstimationError.couldNotReadFrame
@@ -75,40 +74,17 @@ enum ReconstructionEstimator {
             let estimateInitialRotation = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
             let approximateCameraTransform = (wallReference?.cameraTransform ?? matrix_identity_float4x4) * estimateInitialRotation
 
-            let rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
+            let worldPositions = ReconstructionEntityBuilder.worldJointPositions(
                 from: poseSample,
                 cameraTransform: approximateCameraTransform,
                 depthContext: nil,
                 wallReference: wallReference
             )
 
-            // This path has NO real depth at all (see this type's doc comment), so it's the most
-            // likely of the two generation paths to have bone-proportion errors — see
-            // `CalibrationScaleCorrection`'s doc comment. No-ops when `calibratedSegments` is nil
-            // (Step 2 was skipped for this session).
-            let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: nil)
-            // Hand classification needs real depth-grounded hand joints (`handSample: nil` here),
-            // so both hands always come back nil -> rendered as an honest "uncertain" marker. Foot
-            // classification only needs body-joint geometry, so it still runs. Classifies against
-            // the same PRE-retargeting positions the poseSample-based overload would have used
-            // (retargeting is a display/measurement correction, not something classification here
-            // has ever accounted for).
-            let classification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-                poseSample: poseSample,
-                cameraTransform: approximateCameraTransform,
-                depthContext: nil,
-                handSample: nil,
-                handCameraTransform: nil,
-                wallReference: wallReference
-            )
             return ReconstructionEntry(
                 timestampSeconds: timestamp,
                 worldPositions: worldPositions,
                 jointOverrides: nil,
-                leftGrip: classification.leftHand,
-                rightGrip: classification.rightHand,
-                leftFoot: classification.leftFoot,
-                rightFoot: classification.rightFoot,
                 annotationStrokes: [],
                 isApproximate: true
             )
@@ -121,14 +97,6 @@ enum ReconstructionEstimator {
                 timestampSeconds: timestamp,
                 worldPositions: [:],
                 jointOverrides: nil,
-                leftGrip: nil,
-                rightGrip: nil,
-                leftFoot: nil,
-                rightFoot: nil,
-                leftGripOffsetSeconds: nil,
-                rightGripOffsetSeconds: nil,
-                leftFootOffsetSeconds: nil,
-                rightFootOffsetSeconds: nil,
                 annotationStrokes: [],
                 isApproximate: true
             )
