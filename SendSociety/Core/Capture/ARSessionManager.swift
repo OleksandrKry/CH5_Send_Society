@@ -252,11 +252,6 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         }
     }
 
-    /// Rough triangle count across all mesh anchors — the simple "scan progress" cue for Step 1.
-    var estimatedTriangleCount: Int {
-        meshAnchors.reduce(0) { $0 + $1.geometry.faces.count }
-    }
-
     /// Fraction (0...1) of the CURRENT frame's depth grid with a confident (medium+) reading —
     /// a live "is this a good moment to tap Done Scanning" cue for Step 1. Directly answers the
     /// "did I scan enough" question: Step 4's wall is built from a SINGLE frame's depth grid (see
@@ -283,84 +278,5 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
             }
         }
         return Double(confidentCount) / Double(width * height)
-    }
-
-    /// Coarse `columns x rows` grid of average depth confidence (0...1), in the RAW confidence
-    /// buffer's own orientation (landscape, native sensor layout — same raw space every other
-    /// depth-pixel calculation in this app works in). Use `rotatedForCurrentOrientation` before
-    /// displaying this on screen. nil if depth isn't available.
-    ///
-    /// This is a live, per-region approximation of "where does the depth sensor currently have
-    /// good data" — NOT persistent full-wall coverage tracking like Apple's RoomPlan/Object
-    /// Capture (which remember areas you've already scanned well even after you look away, via
-    /// their own internal, unpublished capture-completeness logic). A true equivalent would need
-    /// to raycast the accumulated mesh per screen region rather than just reading the current
-    /// frame's confidence map — a bigger feature to build separately if this isn't enough signal.
-    static func depthConfidenceGrid(for frame: ARFrame?, columns: Int, rows: Int) -> [[Double]]? {
-        guard let confidenceMap = frame?.sceneDepth?.confidenceMap, columns > 0, rows > 0 else { return nil }
-        CVPixelBufferLockBaseAddress(confidenceMap, .readOnly)
-        defer { CVPixelBufferUnlockBaseAddress(confidenceMap, .readOnly) }
-        guard let base = CVPixelBufferGetBaseAddress(confidenceMap) else { return nil }
-        let width = CVPixelBufferGetWidth(confidenceMap)
-        let height = CVPixelBufferGetHeight(confidenceMap)
-        let bytesPerRow = CVPixelBufferGetBytesPerRow(confidenceMap)
-        guard width > 0, height > 0 else { return nil }
-
-        var confidentCounts = [[Int]](repeating: [Int](repeating: 0, count: columns), count: rows)
-        var totalCounts = [[Int]](repeating: [Int](repeating: 0, count: columns), count: rows)
-        for y in 0..<height {
-            let row = base.advanced(by: y * bytesPerRow).assumingMemoryBound(to: UInt8.self)
-            let gridRow = min(rows - 1, y * rows / height)
-            for x in 0..<width {
-                let gridCol = min(columns - 1, x * columns / width)
-                totalCounts[gridRow][gridCol] += 1
-                if let level = ARConfidenceLevel(rawValue: Int(row[x])), level.rawValue >= ARConfidenceLevel.medium.rawValue {
-                    confidentCounts[gridRow][gridCol] += 1
-                }
-            }
-        }
-
-        var grid = [[Double]](repeating: [Double](repeating: 0, count: columns), count: rows)
-        for r in 0..<rows {
-            for c in 0..<columns {
-                grid[r][c] = totalCounts[r][c] > 0 ? Double(confidentCounts[r][c]) / Double(totalCounts[r][c]) : 0
-            }
-        }
-        return grid
-    }
-
-    /// Rotates a RAW-buffer-space grid (from `depthConfidenceGrid`) to match the current device
-    /// orientation, using the SAME landscape-native-sensor convention as
-    /// `BodyPose3DExtractor.cameraOrientation()` (portrait needs a 90° rotation from the sensor's
-    /// native landscape layout, landscapeRight needs 180°, etc.) — this is the standard,
-    /// well-established relationship between a landscape-mounted rear camera sensor and the
-    /// current UI orientation (the same one `AVCaptureConnection.videoOrientation` has used for
-    /// years), not one of this file's other unverified sign-convention guesses. If this heatmap
-    /// ever looks rotated relative to the real wall, `cameraOrientation()` almost certainly has
-    /// the identical issue, since both derive from the same device-orientation switch.
-    static func rotatedForCurrentOrientation(_ grid: [[Double]]) -> [[Double]] {
-        func rotate90Clockwise(_ g: [[Double]]) -> [[Double]] {
-            let rows = g.count
-            guard rows > 0 else { return g }
-            let columns = g[0].count
-            var result = [[Double]](repeating: [Double](repeating: 0, count: rows), count: columns)
-            for r in 0..<rows {
-                for c in 0..<columns {
-                    result[c][rows - 1 - r] = g[r][c]
-                }
-            }
-            return result
-        }
-
-        switch UIDevice.current.orientation {
-        case .landscapeLeft:
-            return grid // sensor's native orientation already
-        case .landscapeRight:
-            return rotate90Clockwise(rotate90Clockwise(grid)) // 180°
-        case .portraitUpsideDown:
-            return rotate90Clockwise(rotate90Clockwise(rotate90Clockwise(grid))) // 270°
-        default: // .portrait, .faceUp, .faceDown, .unknown
-            return rotate90Clockwise(grid) // 90°
-        }
     }
 }

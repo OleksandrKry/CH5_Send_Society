@@ -2,16 +2,14 @@ import CoreGraphics
 import Foundation
 import simd
 
-/// The 3 linear steps of the MVP capture pipeline. Navigation is strictly forward for this
+/// The 2 linear steps of the MVP capture pipeline. Navigation is strictly forward for this
 /// phase — no re-ordering, no skipping.
 enum AppStep: Int, CaseIterable {
-    case wallScan = 0
-    case recording
+    case recording = 0
     case reconstruction
 
     var title: String {
         switch self {
-        case .wallScan: return "Scan the Wall"
         case .recording: return "Record the Climb"
         case .reconstruction: return "3D Reconstruction"
         }

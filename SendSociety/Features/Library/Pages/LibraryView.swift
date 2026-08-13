@@ -14,11 +14,6 @@ struct LibraryView: View {
     @State private var sessionStore: SessionStore?
     @State private var sessions: [RecordingSession] = []
     @State private var isPresentingNewRecording = false
-    /// Second, parallel entry point for the experimental "Quick Record" flow (see
-    /// `ContentView.skipWallScan`) — a separate button/state var so it can be tested alongside the
-    /// original flow without disturbing it. Remove this (and its button/`fullScreenCover` below)
-    /// once the new flow either replaces the original or is dropped.
-    @State private var isPresentingQuickRecording = false
     @State private var reviewingSession: RecordingSession?
     @State private var searchText = ""
 
@@ -36,17 +31,8 @@ struct LibraryView: View {
             .navigationTitle("Send Society")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            isPresentingNewRecording = true
-                        } label: {
-                            Label("New Recording", systemImage: "plus.circle.fill")
-                        }
-                        Button {
-                            isPresentingQuickRecording = true
-                        } label: {
-                            Label("New Recording (Quick — no scan step)", systemImage: "bolt.circle.fill")
-                        }
+                    Button {
+                        isPresentingNewRecording = true
                     } label: {
                         Label("New Recording", systemImage: "plus.circle.fill")
                     }
@@ -63,12 +49,6 @@ struct LibraryView: View {
         .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: refresh) {
             ContentView(onFinished: {
                 isPresentingNewRecording = false
-                refresh()
-            })
-        }
-        .fullScreenCover(isPresented: $isPresentingQuickRecording, onDismiss: refresh) {
-            ContentView(skipWallScan: true, onFinished: {
-                isPresentingQuickRecording = false
                 refresh()
             })
         }
@@ -120,7 +100,7 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
             Text("No recordings yet")
                 .font(.title2.bold())
-            Text("Tap New Recording to scan a wall and capture your first climb.")
+            Text("Tap New Recording to capture your first climb.")
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)
@@ -134,13 +114,6 @@ struct LibraryView: View {
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)
             }
-            // Quick, low-friction way to reach the experimental flow for testing — see
-            // `isPresentingQuickRecording`'s doc comment.
-            Button("Try Quick Record (no scan step)") {
-                isPresentingQuickRecording = true
-            }
-            .font(.footnote)
-            .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }

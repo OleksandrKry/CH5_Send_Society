@@ -2,13 +2,24 @@ import SwiftUI
 import ARKit
 import AVKit
 
-/// Step 3 — Record the Climb. Single Record/Stop button, using the SAME shared ARSession
-/// (via ARSessionManager.onFrameUpdate) so camera transform + depth are captured alongside the
-/// video, keyed by timestamp.
+/// Step 2 — Record the Climb. This is the app's only pre-recording screen: there's no separate
+/// wall-scan step anymore, so this screen does both jobs — gate the Record button on the CURRENT
+/// camera angle having good enough depth coverage (`ARSessionManager.depthConfidenceRatio`), show
+/// move-closer/hold-steady guidance, and capture the wall reference frame
+/// (`ARSessionManager.captureWallTextureReference()`) itself, right as recording actually starts.
+/// Uses the SAME shared ARSession (via ARSessionManager.onFrameUpdate) so camera transform + depth
+/// are captured alongside the video, keyed by timestamp.
+///
+/// NOTE: this used to ALSO require panning up/down to cover the wall's vertical extent (tracking
+/// accumulated mesh height, with a real-floor-detection upgrade via
+/// `ARSessionManager.detectedFloorY`) — removed again after on-device testing showed the "tilt up
+/// to capture the top" guidance getting stuck/flickering unreliably. Only the distance check
+/// remains for now; re-adding vertical coverage later should start from a more robust signal than
+/// accumulated-mesh min/max Y.
 struct RecordingView: View {
     @ObservedObject var arManager: ARSessionManager
     // Recorder + recorded URL are owned by ContentView (not this view) and passed in, so that
-    // coming back here from Step 4 ("pick a different moment") re-shows the already-recorded
+    // coming back here from Step 3 ("pick a different moment") re-shows the already-recorded
     // clip instead of losing it and dropping back to the record button.
     @ObservedObject var recorder: VideoRecorder
     @Binding var recordedURL: URL?
@@ -18,47 +29,24 @@ struct RecordingView: View {
     /// treats both as "annotation/markers unavailable" rather than erroring.
     let session: RecordingSession?
     let sessionStore: SessionStore?
-    /// True for the "Quick Record" flow (`ContentView.skipWallScan`) — Step 1's separate wall-scan
-    /// screen was skipped entirely, so THIS screen has to do both jobs: gate the Record button on
-    /// the CURRENT camera angle having good enough depth coverage (same threshold/signal Step 1's
-    /// "Depth quality" badge uses — `ARSessionManager.depthConfidenceRatio`), show move-closer/
-    /// hold-steady guidance instead of Step 1's mesh-coverage badges, and capture the wall
-    /// reference frame (`ARSessionManager.captureWallTextureReference()`) itself, right as
-    /// recording actually starts, instead of Step 1's "Done Scanning" button doing it ahead of
-    /// time. `false` (the default) preserves Step 3's original always-enabled-record behavior
-    /// exactly, with no readiness gate, no guidance text, and no automatic wall-reference capture
-    /// (Step 1 already did that before this screen ever appears). Declared BEFORE `onGenerate`
-    /// (even though it reads oddly ordered) so `onGenerate` stays the LAST parameter — required
-    /// for every call site's trailing-closure syntax to keep working.
-    ///
-    /// NOTE: this used to ALSO require panning up/down to cover the wall's vertical extent
-    /// (tracking accumulated mesh height, with a real-floor-detection upgrade via
-    /// `ARSessionManager.detectedFloorY`) — removed again after on-device testing showed the
-    /// "tilt up to capture the top" guidance getting stuck/flickering unreliably. Only the
-    /// distance check remains for now; re-adding vertical coverage later should start from a more
-    /// robust signal than accumulated-mesh min/max Y.
-    var requireWallReadiness: Bool = false
     let onGenerate: (URL, RecordedFrameStore, TimeInterval) -> Void
 
-    /// OFF by default — see `ARMeshSceneView.showMesh`'s doc comment. Seeded from
-    /// `DeveloperSettings.showMesh` so a developer's choice carries over from/to Step 1's own
-    /// `MeshToggleButton`.
+    /// OFF by default — see `ARMeshSceneView.showMesh`'s doc comment. A developer toggle to check
+    /// how the mesh is holding up; normal coaches never need to see it.
     @State private var showMesh = DeveloperSettings.showMesh
-    /// Live "is the CURRENT angle scanned well enough" cue, only sampled when
-    /// `requireWallReadiness` is true — same signal and cadence as `WallScanView.depthQuality`.
+    /// Live "is the CURRENT angle scanned well enough" cue — same signal/cadence this screen's
+    /// readiness gate uses.
     @State private var depthQuality: Double?
     @State private var qualityTimer: Timer?
-    /// Set the first time Record is tapped in a `requireWallReadiness` run, so a coach who stops
-    /// and re-starts recording within the same screen visit doesn't re-freeze the wall reference
-    /// (and its now-possibly-different camera angle) out from under an already-recorded clip.
+    /// Set the first time Record is tapped, so a coach who stops and re-starts recording within
+    /// the same screen visit doesn't re-freeze the wall reference (and its now-possibly-different
+    /// camera angle) out from under an already-recorded clip.
     @State private var hasCapturedWallReference = false
 
-    /// Whether Record can actually be tapped right now. Always true when `requireWallReadiness` is
-    /// false (Step 3's original behavior). When true, mirrors `WallScanView`'s own "Good" threshold
-    /// (>= 80% confident depth) so both screens agree on what "good enough" means.
+    /// Whether Record can actually be tapped right now — the CURRENT camera angle needs >= 80%
+    /// confident depth coverage before there's enough data to build a usable wall mesh from.
     private var isReadyToRecord: Bool {
-        guard requireWallReadiness else { return true }
-        return (depthQuality ?? 0) >= 0.8
+        (depthQuality ?? 0) >= 0.8
     }
 
     var body: some View {
@@ -75,21 +63,16 @@ struct RecordingView: View {
             }
         }
         .onAppear {
-            // Normally a no-op here: Step 1's `WallScanView` already called this before this
-            // screen ever appears (see `ARSessionManager.startIfNeeded()`'s own `didConfigure`
-            // guard — calling it twice is safe and cheap). But the Quick Record flow
-            // (`ContentView.skipWallScan`) starts `step` at `.recording` directly, so
-            // `WallScanView` never mounts at all — without this call, the ARSession would never
-            // actually `run()`, and `ARMeshSceneView` would just show a black screen with no
-            // camera passthrough, since it attaches to a session nobody ever started.
+            // This is the first screen the app shows (no separate wall-scan screen anymore), so
+            // this is the only place that needs to start the ARSession —
+            // `ARSessionManager.startIfNeeded()`'s own `didConfigure` guard makes this safe to
+            // call even if something else already started it.
             arManager.startIfNeeded()
             arManager.onFrameUpdate = { [weak recorder] frame in
                 recorder?.append(frame)
             }
-            if requireWallReadiness {
-                qualityTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-                    depthQuality = ARSessionManager.depthConfidenceRatio(for: arManager.latestFrame)
-                }
+            qualityTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                depthQuality = ARSessionManager.depthConfidenceRatio(for: arManager.latestFrame)
             }
         }
         .onDisappear {
@@ -102,14 +85,8 @@ struct RecordingView: View {
     private var controls: some View {
         VStack {
             VStack(alignment: .leading, spacing: 4) {
-                Text(requireWallReadiness ? "Point at the Wall" : "Step 3 — Record the Climb").font(.headline)
-                if requireWallReadiness {
-                    readinessGuidance
-                } else {
-                    Text("Same continuous AR session — camera transform and depth are captured alongside the video.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                Text("Point at the Wall").font(.headline)
+                readinessGuidance
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -125,9 +102,8 @@ struct RecordingView: View {
         }
     }
 
-    /// "Move closer" / "hold steady" / "ready" guidance in place of Step 1's mesh-coverage badges
-    /// — same ratio/threshold breakpoints as `WallScanView.depthQualityBadge`, reworded for a
-    /// screen that's ALSO the record button, not a separate scanning step.
+    /// "Move closer" / "hold steady" / "ready" guidance so the coach knows whether the CURRENT
+    /// camera angle has good enough depth coverage yet, without a separate scanning step.
     @ViewBuilder
     private var readinessGuidance: some View {
         let ratio = depthQuality ?? 0
@@ -155,11 +131,10 @@ struct RecordingView: View {
                     recordedURL = url
                 }
             } else {
-                if requireWallReadiness, !hasCapturedWallReference {
+                if !hasCapturedWallReference {
                     // The wall structure is saved AT THIS MOMENT — right as recording actually
-                    // starts, from whatever angle the coach is currently standing at — instead of
-                    // Step 1's separate "Done Scanning" tap ahead of time. See this property's and
-                    // `requireWallReadiness`'s doc comments.
+                    // starts, from whatever angle the coach is currently standing at. See
+                    // `hasCapturedWallReference`'s doc comment.
                     arManager.captureWallTextureReference()
                     hasCapturedWallReference = true
                 }
