@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -50,6 +50,7 @@
 /* Begin PBXFileReference section */
 		0095405D8132C3FB2A4531F2 /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
 		017E50A5312541079C0CCA68 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationHeightCorrection.swift; sourceTree = "<group>"; };
 		11847F3954984489906204D4 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
 		1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationOverlay.swift; sourceTree = "<group>"; };
 		173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionReviewView.swift; sourceTree = "<group>"; };
@@ -63,6 +64,8 @@
 		42BF999F98834402830605C8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPose3DExtractor.swift; sourceTree = "<group>"; };
+		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
+		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionView.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
@@ -89,6 +92,10 @@
 		F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonPoseEditor.swift; sourceTree = "<group>"; };
 		FCD86D16F0074C0880EC5727 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		1A8F2D9D302AEBF2005888A8 /* Onboarding */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Onboarding; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		BA6FDB6E278A4E218E974A6A /* Frameworks */ = {
@@ -227,6 +234,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		A9CFFD8FEF82A8176E34D7D9 /* Pages */ = {
+			isa = PBXGroup;
+			children = (
+				2EF5A9C90C43485788419CCE /* WallScanView.swift */,
+			);
+			path = Pages;
+			sourceTree = "<group>";
+		};
 		B0E8DE97AC814F5FA1113BC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -305,6 +320,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				1A8F2D9D302AEBF2005888A8 /* Onboarding */,
 			);
 			name = SendSociety;
 			productName = SendSociety;
