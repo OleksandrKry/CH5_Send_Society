@@ -13,8 +13,17 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var arManager = ARSessionManager()
-    @State private var step: AppStep = .wallScan
+    @State private var step: AppStep
     @State private var reconstructionInput: ReconstructionInput?
+
+    /// True for the experimental "Quick Record" entry point (see `LibraryView`'s second "New
+    /// Recording" button) — skips Step 1's separate wall-scan screen entirely and starts directly
+    /// on the record screen, whose Record button stays disabled until the coach's CURRENT camera
+    /// angle has good enough depth coverage on its own (see `RecordingView.requireWallReadiness`).
+    /// The wall reference frame Step 1's "Done Scanning" button used to capture ahead of time is
+    /// instead captured automatically the moment Record is first tapped. `false` (the default)
+    /// preserves the original 3-step pipeline exactly.
+    let skipWallScan: Bool
 
     // Owned here (not inside RecordingView) so navigating Step 4 -> back -> Step 3 re-shows the
     // already-recorded clip for a re-pick instead of losing it and dropping back to record/stop.
@@ -41,6 +50,15 @@ struct ContentView: View {
     /// Called when the coach is done with this recording (explicit "Done" from Step 4, or backing
     /// out) — returns to `LibraryView`. Set by whichever parent presented this view.
     var onFinished: () -> Void = {}
+
+    /// Custom init only so `step`'s STARTING value can depend on `skipWallScan` — `@State`'s
+    /// default-value syntax (`= .wallScan`) can't reference another parameter, so this has to be
+    /// set explicitly via `State(initialValue:)` here instead.
+    init(skipWallScan: Bool = false, onFinished: @escaping () -> Void = {}) {
+        self.skipWallScan = skipWallScan
+        self.onFinished = onFinished
+        _step = State(initialValue: skipWallScan ? .recording : .wallScan)
+    }
 
     var body: some View {
         Group {
@@ -77,7 +95,7 @@ struct ContentView: View {
                 step = .recording
             }
         case .recording:
-            RecordingView(arManager: arManager, recorder: recorder, recordedURL: $recordedURL, session: currentSession, sessionStore: sessionStore) { url, frameStore, pausedSeconds in
+            RecordingView(arManager: arManager, recorder: recorder, recordedURL: $recordedURL, session: currentSession, sessionStore: sessionStore, requireWallReadiness: skipWallScan) { url, frameStore, pausedSeconds in
                 reconstructionInput = ReconstructionInput(videoURL: url, frameStore: frameStore, pausedSeconds: pausedSeconds)
                 step = .reconstruction
             }

@@ -12,10 +12,14 @@ struct WallScanView: View {
     @State private var depthQuality: Double?
     @State private var confidenceGrid: [[Double]]?
     @State private var qualityTimer: Timer?
+    /// OFF by default — see `ARMeshSceneView.showMesh`'s doc comment. Seeded from
+    /// `DeveloperSettings.showMesh` so a developer's choice on this screen carries over to/from
+    /// the record screen's own `MeshToggleButton`.
+    @State private var showMesh = DeveloperSettings.showMesh
 
     var body: some View {
         ZStack(alignment: .top) {
-            ARMeshSceneView(session: arManager.session)
+            ARMeshSceneView(session: arManager.session, showMesh: showMesh)
                 .ignoresSafeArea()
 
             coverageHeatmapOverlay
@@ -31,6 +35,10 @@ struct WallScanView: View {
                 doneButton
             }
             .padding()
+
+            MeshToggleButton(showMesh: $showMesh)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+                .padding()
         }
         .onAppear {
             arManager.startIfNeeded()
