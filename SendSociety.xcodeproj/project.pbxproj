@@ -43,6 +43,7 @@
 		D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230F572E3FAC418F97998530 /* PixelBufferCopy.swift */; };
 		D96EA0DEEE064E5AA1092966 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BF999F98834402830605C8 /* Models.swift */; };
 		F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */; };
+		5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */; };
 		F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */; };
 		F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5512CAFDE841AFB01DCEDF /* SessionFileStore.swift */; };
 /* End PBXBuildFile section */
@@ -64,6 +65,7 @@
 		42BF999F98834402830605C8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPose3DExtractor.swift; sourceTree = "<group>"; };
+		FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonPresenceDetector.swift; sourceTree = "<group>"; };
 		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
 		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
@@ -217,6 +219,7 @@
 			isa = PBXGroup;
 			children = (
 				4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */,
+				FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */,
 				F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */,
 				F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */,
 				C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */,
@@ -381,6 +384,7 @@
 				05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */,
 				BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */,
 				F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */,
+				5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */,
 				5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */,
 				668D2FDE36D8430C9E10EED4 /* DeveloperSettings.swift in Sources */,
 				66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */,

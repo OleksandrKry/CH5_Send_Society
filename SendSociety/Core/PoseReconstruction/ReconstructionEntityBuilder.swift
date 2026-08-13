@@ -469,15 +469,19 @@ enum ReconstructionEntityBuilder {
     /// `skeletonEntity`) so callers — e.g. ReconstructionView's camera-framing code — can use the
     /// same positions without recomputing them.
     ///
-    /// When `depthContext` is available (the recorded frame had real LiDAR depth), every joint
-    /// that CAN be grounded in that real depth is, via `BodyPose3DExtractor.groundJointsBestEffort`
-    /// — this is what fixes both the climber-height accuracy and the skeleton-vs-wall placement
-    /// (the wall mesh is built from the SAME depth data, so grounding the skeleton in it puts both
-    /// in a consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
-    /// depth guess). Only the specific joint(s) that fail to ground (e.g. an occluded hand) fall
-    /// back to Vision's own estimate — see `groundJointsBestEffort`'s doc comment for why an
-    /// all-or-nothing per-frame result would be worse. Falls back to the ungrounded, Vision-only
-    /// estimate for every joint only when there's no depth data for this frame at all.
+    /// When `depthContext` is available (the recorded frame had real LiDAR depth), the WHOLE
+    /// skeleton is grounded via a single trusted anchor — the hip/root joint — through
+    /// `BodyPose3DExtractor.groundSkeletonRootAnchored`: the hip's real LiDAR depth vs. Vision's
+    /// own depth guess for the hip gives a scale factor, and every other joint's Vision-estimated
+    /// offset from the hip is scaled by that SAME factor, uniformly in all three axes. This is
+    /// what fixes both the climber-height accuracy and the skeleton-vs-wall placement (the wall
+    /// mesh is built from the SAME depth data, so grounding the skeleton in it puts both in a
+    /// consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
+    /// depth guess) — see that function's doc comment for why this replaced an earlier version
+    /// that grounded every joint independently (it couldn't guarantee bone lengths stayed
+    /// physically plausible). Falls back to the ungrounded, Vision-only estimate for every joint
+    /// when there's no depth data for this frame at all, OR when the hip's own LiDAR reading fails
+    /// its sanity check.
     ///
     /// `wallReference`, when available, is used as a final sanity pass (`keepInFrontOfWall`) —
     /// the wall's point-cloud mesh and the skeleton are grounded from DIFFERENT frames (Step 1's
@@ -503,21 +507,18 @@ enum ReconstructionEntityBuilder {
             return keepInFrontOfWall(worldPositions, wallReference: wallReference)
         }
 
-        // Best-effort, not all-or-nothing: keep real LiDAR grounding for every joint that succeeds,
-        // and only fall back to Vision's own (less accurate) estimate for whichever SPECIFIC
-        // joint(s) fail — see `groundJointsBestEffort`'s doc comment for why throwing away every
-        // other joint's real depth over one bad reading (e.g. a hand's confidence-dropout search
-        // grabbing the wall behind it) was making the WHOLE skeleton visibly worse than necessary.
-        let (grounded, ungroundedJoints) = BodyPose3DExtractor.groundJointsBestEffort(
+        // Ground the hip in real LiDAR depth, then scale every other joint's Vision-estimated
+        // offset from the hip by that same factor — see `groundSkeletonRootAnchored`'s doc comment
+        // for why this replaced independently grounding all 17 joints.
+        let (grounded, isRootGrounded) = BodyPose3DExtractor.groundSkeletonRootAnchored(
             sample.rootRelativePositions,
             cameraOriginMatrix: sample.cameraOriginMatrix,
             context: depthContext
         )
-        if ungroundedJoints.isEmpty {
-            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (17/17 joints)")
+        if isRootGrounded {
+            DebugLog.reconstruction.info("Step 4 skeleton placed using root-anchored LiDAR scale (hip grounded, \(grounded.count, privacy: .public) joints scaled to match)")
         } else {
-            let resolved = sample.rootRelativePositions.count - ungroundedJoints.count
-            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (\(resolved)/\(sample.rootRelativePositions.count) joints — the rest used Vision-only, see prior warning for which)")
+            DebugLog.reconstruction.info("Step 4 skeleton placed using Vision-only estimate (hip LiDAR grounding unavailable or failed its sanity check)")
         }
         var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
         for (joint, cameraSpace) in grounded {
