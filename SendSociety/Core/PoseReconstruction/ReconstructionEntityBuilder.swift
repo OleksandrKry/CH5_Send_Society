@@ -526,56 +526,6 @@ enum ReconstructionEntityBuilder {
         return keepInFrontOfWall(worldPositions, wallReference: wallReference)
     }
 
-    /// YOLO-backend equivalent of `worldJointPositions(from:cameraTransform:depthContext:
-    /// wallReference:)` above — takes joints already known in RAW PIXEL space
-    /// (`BodyPose3DExtractor.groundPixelJoints`'s expected input, matching `YOLOBodyPoseDetector`
-    /// 's native output) instead of deriving them from a Vision `BodyPoseSample`'s rootRelative/
-    /// cameraOriginMatrix shape. Applies the same `keepInFrontOfWall` safety pass as the Vision
-    /// path.
-    ///
-    /// UNLIKE the Vision version, there is no "fall back to a less-accurate whole-frame estimate
-    /// when there's no depth" case — YOLO has no non-depth 3D estimate to fall back to at all
-    /// (see `BodyPose3DExtractor.groundPixelJoints`'s doc comment), so `depthContext` is required
-    /// here, not optional, and a joint that doesn't ground is simply absent from the result.
-    static func worldJointPositions(
-        fromPixelJoints pixelJoints: [BodyJointName: CGPoint],
-        cameraTransform: simd_float4x4,
-        depthContext: BodyPose3DExtractor.DepthGroundingContext,
-        wallReference: ARSessionManager.WallTextureReference? = nil
-    ) -> [BodyJointName: SIMD3<Float>] {
-        let grounded = BodyPose3DExtractor.groundPixelJoints(pixelJoints, context: depthContext)
-        var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
-        for (joint, cameraSpace) in grounded {
-            worldPositions[joint] = BodyPose3DExtractor.worldPosition(cameraSpace: cameraSpace, cameraTransform: cameraTransform)
-        }
-        return keepInFrontOfWall(worldPositions, wallReference: wallReference)
-    }
-
-    /// Hybrid backend, for `ReconstructionEstimator`'s "Estimate 3D" path ONLY (never Step 4
-    /// Generate or Calibration): YOLO supplies joint PIXEL positions (per the user's explicit
-    /// choice — YOLO's skeleton/bone detection is more reliable than Vision's own 2D estimate),
-    /// while Vision's own (non-LiDAR) 3D pose estimate supplies the per-joint DEPTH that YOLO has
-    /// no way to produce on its own — see `BodyPose3DExtractor.visionEstimatedDepths`/
-    /// `unprojectWithExternalDepth`, which this is a thin wrapper around. `intrinsics` here is the
-    /// wall's archived reference-frame intrinsics (`ARSessionManager.WallTextureReference
-    /// .intrinsics`) — valid to reuse because the recorded video is written directly from
-    /// `ARFrame.capturedImage` (see `VideoRecorder`), the exact same raw sensor buffer/resolution
-    /// the wall reference frame's intrinsics were captured against.
-    static func worldJointPositions(
-        fromPixelJoints pixelJoints: [BodyJointName: CGPoint],
-        visionDepths: [BodyJointName: Float],
-        intrinsics: simd_float3x3,
-        cameraTransform: simd_float4x4,
-        wallReference: ARSessionManager.WallTextureReference? = nil
-    ) -> [BodyJointName: SIMD3<Float>] {
-        let grounded = BodyPose3DExtractor.unprojectWithExternalDepth(pixelJoints, depths: visionDepths, intrinsics: intrinsics)
-        var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
-        for (joint, cameraSpace) in grounded {
-            worldPositions[joint] = BodyPose3DExtractor.worldPosition(cameraSpace: cameraSpace, cameraTransform: cameraTransform)
-        }
-        return keepInFrontOfWall(worldPositions, wallReference: wallReference)
-    }
-
     /// A crude flat-plane approximation of the wall, derived from the SAME single reference frame
     /// the wall's point-cloud mesh/texture come from: a point at the reference camera's position
     /// plus its forward direction times the reference frame's average measured depth, with the
@@ -638,29 +588,6 @@ enum ReconstructionEntityBuilder {
         wallReference: ARSessionManager.WallTextureReference?
     ) -> (leftHand: GripClassification?, rightHand: GripClassification?, leftFoot: FootClassification?, rightFoot: FootClassification?) {
         let worldPositions = worldJointPositions(from: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, wallReference: wallReference)
-        return classifyGripsAndFeet(
-            worldPositions: worldPositions,
-            handSample: handSample,
-            handCameraTransform: handCameraTransform,
-            cameraTransform: cameraTransform,
-            wallReference: wallReference
-        )
-    }
-
-    /// Same classification as the `poseSample`-based overload above, for callers that already
-    /// have FINAL world-space joint positions instead of a Vision `BodyPoseSample` to derive them
-    /// from — used by the YOLO backend (`PoseDetectionSettings.useYOLO`), whose positions come
-    /// from `worldJointPositions(fromPixelJoints:...)` rather than Vision's rootRelative/
-    /// cameraOriginMatrix shape. The `poseSample`-based overload is now just this function fed
-    /// `worldJointPositions(from: poseSample, ...)`'s output — behavior for every existing
-    /// Vision caller is completely unchanged.
-    static func classifyGripsAndFeet(
-        worldPositions: [BodyJointName: SIMD3<Float>],
-        handSample: HandPoseSample?,
-        handCameraTransform: simd_float4x4?,
-        cameraTransform: simd_float4x4,
-        wallReference: ARSessionManager.WallTextureReference?
-    ) -> (leftHand: GripClassification?, rightHand: GripClassification?, leftFoot: FootClassification?, rightFoot: FootClassification?) {
         let wallNormal = wallReference.flatMap { wallPlane(from: $0)?.normal }
 
         func handWorldJoints(_ cameraSpace: [HandJointName: SIMD3<Float>]) -> [HandJointName: SIMD3<Float>] {

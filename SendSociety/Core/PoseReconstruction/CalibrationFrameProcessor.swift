@@ -40,10 +40,6 @@ enum CalibrationFrameProcessor {
         deviceOrientation: UIDeviceOrientation,
         lockedGroundingMode: GroundingMode?
     ) -> Result {
-        if PoseDetectionSettings.useYOLO {
-            return processWithYOLO(frame: frame, deviceOrientation: deviceOrientation, lockedGroundingMode: lockedGroundingMode)
-        }
-
         let sample: BodyPoseSample
         do {
             sample = try BodyPose3DExtractor.detect(in: frame.capturedImage, deviceOrientation: deviceOrientation)
@@ -73,44 +69,5 @@ enum CalibrationFrameProcessor {
         case .ungrounded:
             return .positions(sample.rootRelativePositions, groundingMode: .ungrounded)
         }
-    }
-
-    /// YOLO backend variant of `process` — see `PoseDetectionSettings.useYOLO`'s doc comment for
-    /// how this gets selected. Structurally simpler than the Vision path: YOLO's `.xy` output is
-    /// already in raw pixel space (no rootRelative/cameraOriginMatrix bearing to rotate first —
-    /// see `BodyPose3DExtractor.groundPixelJoints`'s doc comment), and there's no `.ungrounded`
-    /// mode available at all here, since YOLO has no depth/Z estimate of its own to fall back to
-    /// the way Vision's root-relative 3D estimate is (`sample.rootRelativePositions` above). A
-    /// frame with no usable LiDAR depth, or where grounding produces nothing at all, simply can't
-    /// contribute to calibration when this backend is active.
-    private static func processWithYOLO(
-        frame: ARFrame,
-        deviceOrientation: UIDeviceOrientation,
-        lockedGroundingMode: GroundingMode?
-    ) -> Result {
-        let pixelJoints: [BodyJointName: YOLOBodyPoseDetector.DetectedJoint]
-        do {
-            DebugLog.general.info("YOLO before detect model")
-            pixelJoints = try YOLOBodyPoseDetector.detect(in: frame.capturedImage)
-        } catch YOLOBodyPoseDetector.DetectionError.noPersonDetected {
-            return .noPersonDetected
-        } catch {
-            return .error(error.localizedDescription)
-        }
-        guard let context = BodyPose3DExtractor.DepthGroundingContext.from(frame: frame, deviceOrientation: deviceOrientation) else {
-            return .error("No LiDAR depth available for this frame — the YOLO backend has no ungrounded fallback to use instead.")
-        }
-
-        // Defensive only — the app never locks anything but `.grounded` for this backend, but
-        // guards against ever mixing a YOLO-grounded frame into a session that locked
-        // `.ungrounded` under Vision earlier in the same capture (e.g. the backend switch
-        // flipping mid-session, which shouldn't happen in normal use but costs nothing to guard).
-        if let lockedGroundingMode, lockedGroundingMode != .grounded {
-            return .trackingDip
-        }
-
-        let grounded = BodyPose3DExtractor.groundPixelJoints(pixelJoints.mapValues(\.point), context: context)
-        guard !grounded.isEmpty else { return .trackingDip }
-        return .positions(grounded, groundingMode: .grounded)
     }
 }

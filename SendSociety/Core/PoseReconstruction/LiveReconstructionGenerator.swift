@@ -52,13 +52,11 @@ enum LiveReconstructionGenerator {
         let rightGripOffsetSeconds: TimeInterval?
         let leftFootOffsetSeconds: TimeInterval?
         let rightFootOffsetSeconds: TimeInterval?
-        /// nil exactly when no body was detected/grounded at all (`poseSample` nil for the
-        /// Vision path, or the YOLO path found nothing to ground). These are the FINAL,
-        /// calibration-retargeted positions (`CalibrationScaleCorrection.retargeted(...)` already
-        /// applied) — `ContentView` must render from THIS field directly (`ReconstructionView
-        /// .initialWorldPositions`) rather than re-deriving positions from `poseSample`, both
-        /// because that re-derivation skipped the retargeting step, and because `poseSample` is
-        /// always nil for a YOLO-generated result (nothing Vision-shaped to re-derive from).
+        /// nil exactly when no body was detected/grounded at all (`poseSample` nil). These are the
+        /// FINAL, calibration-retargeted positions (`CalibrationScaleCorrection.retargeted(...)`
+        /// already applied) — `ContentView` must render from THIS field directly (`ReconstructionView
+        /// .initialWorldPositions`) rather than re-deriving positions from `poseSample`, since that
+        /// re-derivation skipped the retargeting step.
         let worldPositions: [BodyJointName: SIMD3<Float>]?
     }
 
@@ -102,18 +100,6 @@ enum LiveReconstructionGenerator {
         // specifically because `RecordedFrameData` deliberately never stores color itself. No-op
         // (stays nil) when there was no depth data at all for this frame.
         let depthContext = baseDepthContext?.withLumaSource(.cgImage(mainImage))
-
-        if PoseDetectionSettings.useYOLO {
-            return generateWithYOLO(
-                input: input,
-                wallReference: wallReference,
-                calibratedSegments: calibratedSegments,
-                frameData: frameData,
-                cameraTransform: cameraTransform,
-                mainImage: mainImage,
-                depthContext: depthContext
-            )
-        }
 
         var poseSample: BodyPoseSample?
         var poseError: String?
@@ -238,162 +224,12 @@ enum LiveReconstructionGenerator {
         // see `CalibrationScaleCorrection`'s doc comment for why this frame's own detection has no
         // other way to know an individual limb's proportions are off. No-ops when
         // `calibratedSegments` is nil (Step 2 was skipped).
-        let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
+        let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: nil)
 
         return Result(
             cameraTransform: cameraTransform,
             depthContext: depthContext,
             poseSample: poseSample,
-            poseError: nil,
-            leftGrip: leftGrip,
-            rightGrip: rightGrip,
-            leftFoot: leftFoot,
-            rightFoot: rightFoot,
-            leftGripOffsetSeconds: leftGripOffsetSeconds,
-            rightGripOffsetSeconds: rightGripOffsetSeconds,
-            leftFootOffsetSeconds: leftFootOffsetSeconds,
-            rightFootOffsetSeconds: rightFootOffsetSeconds,
-            worldPositions: worldPositions
-        )
-    }
-
-    /// YOLO-backend variant of the body-detection/classification/retargeting portion of
-    /// `generate` — the frame lookup, video extraction, and depth-context setup above are
-    /// identical for both backends, so this only takes over from that point on. Structurally
-    /// mirrors the Vision path (same nearby-frame fallback search, same retargeting step, same
-    /// `Result` shape). Hand detection stays Vision-based regardless of backend — see
-    /// `PoseDetectionSettings.useYOLO`'s doc comment: YOLO here is scoped to body joints only.
-    ///
-    /// `Result.poseSample` is ALWAYS nil for this path — YOLO produces no `BodyPoseSample`, and
-    /// there's nothing Vision-shaped to put there. `ContentView` MUST use `Result.worldPositions`
-    /// directly to render this case rather than falling back to re-deriving positions from
-    /// `poseSample` the way it previously did — see `Result.worldPositions`'s doc comment for why
-    /// that re-derivation was changed to use this field directly for BOTH backends.
-    private static func generateWithYOLO(
-        input: ReconstructionInput,
-        wallReference: ARSessionManager.WallTextureReference?,
-        calibratedSegments: SegmentLengths?,
-        frameData: RecordedFrameData,
-        cameraTransform: simd_float4x4,
-        mainImage: CGImage,
-        depthContext: BodyPose3DExtractor.DepthGroundingContext?
-    ) -> Result {
-        var poseError: String?
-        var pixelJoints: [BodyJointName: YOLOBodyPoseDetector.DetectedJoint] = [:]
-        do {
-            pixelJoints = try YOLOBodyPoseDetector.detect(in: mainImage)
-        } catch {
-            poseError = "No body pose detected in this frame — try a different moment in the video."
-            let description = String(describing: error)
-            DebugLog.reconstruction.error("YOLO body pose detection failed for reconstruction: \(description, privacy: .public)")
-        }
-
-        guard !pixelJoints.isEmpty, let depthContext else {
-            // No detection at all, OR no depth to ground against — YOLO has no non-depth
-            // fallback estimate the way Vision's own 3D request has (see `BodyPose3DExtractor
-            // .groundPixelJoints`'s doc comment). Still a normal `Result`, not a throw — matches
-            // the Vision path's "no climber detected" handling (wall-only view still usable).
-            if depthContext == nil, poseError == nil {
-                poseError = "No LiDAR depth for this frame — the YOLO backend has no fallback estimate to use instead."
-            }
-            return Result(
-                cameraTransform: cameraTransform,
-                depthContext: depthContext,
-                poseSample: nil,
-                poseError: poseError,
-                leftGrip: nil,
-                rightGrip: nil,
-                leftFoot: nil,
-                rightFoot: nil,
-                leftGripOffsetSeconds: nil,
-                rightGripOffsetSeconds: nil,
-                leftFootOffsetSeconds: nil,
-                rightFootOffsetSeconds: nil,
-                worldPositions: nil
-            )
-        }
-
-        let rawWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
-            fromPixelJoints: pixelJoints.mapValues(\.point),
-            cameraTransform: cameraTransform,
-            depthContext: depthContext,
-            wallReference: wallReference
-        )
-
-        // Hand detection stays Vision-based regardless of backend — see this function's doc
-        // comment.
-        let mainHandSample = BodyPose3DExtractor.detectHands(inVideoFrame: mainImage, context: depthContext)
-        let mainClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-            worldPositions: rawWorldPositions,
-            handSample: mainHandSample,
-            handCameraTransform: cameraTransform,
-            cameraTransform: cameraTransform,
-            wallReference: wallReference
-        )
-        var leftGrip = mainClassification.leftHand
-        var rightGrip = mainClassification.rightHand
-        var leftFoot = mainClassification.leftFoot
-        var rightFoot = mainClassification.rightFoot
-        var leftGripOffsetSeconds: TimeInterval?
-        var rightGripOffsetSeconds: TimeInterval?
-        var leftFootOffsetSeconds: TimeInterval?
-        var rightFootOffsetSeconds: TimeInterval?
-
-        func meets(_ c: GripClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
-        func meetsFoot(_ c: FootClassification?) -> Bool { (c?.confidence ?? 0) >= GripClassifier.confidenceThreshold }
-
-        // Same nearby-frame fallback idea as the Vision path — see `generate`'s doc comment on
-        // its own version of this loop for the full reasoning.
-        if !meets(leftGrip) || !meets(rightGrip) || !meetsFoot(leftFoot) || !meetsFoot(rightFoot) {
-            let candidates = Array(input.frameStore.nearbyFrames(toPlaybackSeconds: input.pausedSeconds, withinSeconds: 1.5).prefix(8))
-            for candidate in candidates {
-                guard let candidateSeconds = input.frameStore.playbackSeconds(forTimestamp: candidate.timestamp),
-                      let candidateImage = VideoFrameExtractor.extractFrame(from: input.videoURL, atSeconds: candidateSeconds),
-                      let candidateDepthContext = candidate.depthGroundingContext,
-                      let candidatePixelJoints = try? YOLOBodyPoseDetector.detect(in: candidateImage),
-                      !candidatePixelJoints.isEmpty
-                else { continue }
-                let candidateWorldPositions = ReconstructionEntityBuilder.worldJointPositions(
-                    fromPixelJoints: candidatePixelJoints.mapValues(\.point),
-                    cameraTransform: candidate.cameraTransform,
-                    depthContext: candidateDepthContext,
-                    wallReference: wallReference
-                )
-                let candidateHands = BodyPose3DExtractor.detectHands(inVideoFrame: candidateImage, context: candidateDepthContext)
-                let candidateClassification = ReconstructionEntityBuilder.classifyGripsAndFeet(
-                    worldPositions: candidateWorldPositions,
-                    handSample: candidateHands,
-                    handCameraTransform: candidate.cameraTransform,
-                    cameraTransform: candidate.cameraTransform,
-                    wallReference: wallReference
-                )
-                let offset = candidate.timestamp - frameData.timestamp
-
-                if !meets(leftGrip), meets(candidateClassification.leftHand) {
-                    leftGrip = candidateClassification.leftHand
-                    leftGripOffsetSeconds = offset
-                }
-                if !meets(rightGrip), meets(candidateClassification.rightHand) {
-                    rightGrip = candidateClassification.rightHand
-                    rightGripOffsetSeconds = offset
-                }
-                if !meetsFoot(leftFoot), meetsFoot(candidateClassification.leftFoot) {
-                    leftFoot = candidateClassification.leftFoot
-                    leftFootOffsetSeconds = offset
-                }
-                if !meetsFoot(rightFoot), meetsFoot(candidateClassification.rightFoot) {
-                    rightFoot = candidateClassification.rightFoot
-                    rightFootOffsetSeconds = offset
-                }
-            }
-        }
-
-        let worldPositions = CalibrationScaleCorrection.retargeted(rawWorldPositions, toMatch: calibratedSegments)
-
-        return Result(
-            cameraTransform: cameraTransform,
-            depthContext: depthContext,
-            poseSample: nil,
             poseError: nil,
             leftGrip: leftGrip,
             rightGrip: rightGrip,

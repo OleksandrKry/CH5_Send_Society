@@ -150,7 +150,6 @@ enum BodyPose3DExtractor {
         guard let observation = request.results?.first else {
             throw BodyPoseError.noPersonDetected
         }
-        
 
         var positions: [BodyJointName: SIMD3<Float>] = [:]
         for (ours, vision) in jointMap {
@@ -488,126 +487,6 @@ enum BodyPose3DExtractor {
             points[joint] = CGPoint(x: CGFloat(u), y: CGFloat(v))
         }
         return points
-    }
-
-    /// Grounds joints that are ALREADY known in raw pixel space — unlike `groundAllJoints`/
-    /// `groundJointsBestEffort`, which start from Vision's 3D root-relative bearing and rotate it
-    /// into raw sensor space first (`rotateBearingToRawSensorFrame`), this skips that step
-    /// entirely. Used by the YOLO backend (`YOLOBodyPoseDetector`), whose `.xy` output already
-    /// lands directly in this raw coordinate space (see that type's doc comment for why) — same
-    /// idea as `lidarPosition(atPixel:context:)` (used for hand joints), but sharing this file's
-    /// locked-buffer + bilateral-weighted depth lookup infrastructure instead of that function's
-    /// simpler ad-hoc locking, since body joints are in scope for the bilateral fix and hands
-    /// deliberately aren't (see `BodyPose3DExtractor.LumaSource`'s doc comment).
-    ///
-    /// Returns only joints that actually grounded — there is no "Vision-only fallback" available
-    /// here the way `lidarGroundedCameraSpacePosition` has one (YOLO itself has no depth/Z
-    /// estimate at all, unlike Vision's 3D request), so an ungrounded joint is simply OMITTED
-    /// from the result rather than guessed at. Callers that need "were enough joints present"
-    /// semantics (e.g. `CalibrationEngine.ingest`'s required-joints check) already handle a
-    /// partial dictionary correctly — no all-or-nothing behavior needed here.
-    static func groundPixelJoints(
-        _ pixelJoints: [BodyJointName: CGPoint],
-        context: DepthGroundingContext
-    ) -> [BodyJointName: SIMD3<Float>] {
-        guard let buffers = lockedDepthBuffers(context: context) else { return [:] }
-        defer { buffers.unlock() }
-
-        let width = Float(context.imageResolution.width)
-        let height = Float(context.imageResolution.height)
-        let fx = context.intrinsics.columns.0.x
-        let fy = context.intrinsics.columns.1.y
-        let cx = context.intrinsics.columns.2.x
-        let cy = context.intrinsics.columns.2.y
-
-        var grounded: [BodyJointName: SIMD3<Float>] = [:]
-        for (joint, pixel) in pixelJoints {
-            let u = Float(pixel.x)
-            let v = Float(pixel.y)
-            guard u >= 0, v >= 0, u < width, v < height else { continue }
-
-            let depthX = Int(u / width * Float(buffers.depthWidth))
-            let depthY = Int(v / height * Float(buffers.depthHeight))
-            guard depthX >= 0, depthX < buffers.depthWidth, depthY >= 0, depthY < buffers.depthHeight else { continue }
-
-            let depth: Float?
-            if let luma = buffers.luma, let targetLuma = luma.brightness(x: Int(u), y: Int(v)) {
-                depth = bilateralWeightedDepth(
-                    depthBase: buffers.depthBase, depthBytesPerRow: buffers.depthBytesPerRow,
-                    confidenceBase: buffers.confidenceBase, confidenceBytesPerRow: buffers.confidenceBytesPerRow,
-                    depthWidth: buffers.depthWidth, depthHeight: buffers.depthHeight,
-                    targetDepthX: depthX, targetDepthY: depthY,
-                    luma: luma, targetLuma: targetLuma
-                ) ?? nearestConfidentDepth(
-                    depthBase: buffers.depthBase, depthBytesPerRow: buffers.depthBytesPerRow,
-                    confidenceBase: buffers.confidenceBase, confidenceBytesPerRow: buffers.confidenceBytesPerRow,
-                    width: buffers.depthWidth, height: buffers.depthHeight, x: depthX, y: depthY
-                )
-            } else {
-                depth = nearestConfidentDepth(
-                    depthBase: buffers.depthBase, depthBytesPerRow: buffers.depthBytesPerRow,
-                    confidenceBase: buffers.confidenceBase, confidenceBytesPerRow: buffers.confidenceBytesPerRow,
-                    width: buffers.depthWidth, height: buffers.depthHeight, x: depthX, y: depthY
-                )
-            }
-            guard let depth else { continue }
-
-            // Same unprojection as `lidarPosition(atPixel:context:)` — CAMERA-SPACE, ARKit
-            // convention (combine with a cameraTransform to get world space).
-            let xCV = (u - cx) * depth / fx
-            let yCV = (v - cy) * depth / fy
-            grounded[joint] = SIMD3<Float>(xCV, -yCV, -depth)
-        }
-        return grounded
-    }
-
-    /// Depth-only extraction from Vision's own (non-LiDAR) 3D pose estimate — the camera-space
-    /// distance-from-camera implied by `cameraOriginMatrix * rootRelativePosition` for each
-    /// joint, with the actual X/Y bearing discarded (that comes from YOLO's pixel detection
-    /// instead — see `unprojectWithExternalDepth` below). This exists ONLY for the "Estimate 3D"
-    /// hybrid path (`ReconstructionEstimator`), which has no ARFrame/LiDAR depth map at all to
-    /// ground anything in — Vision's own full 3D estimate is the only depth signal available
-    /// there, used as an (imperfect, but better than nothing) substitute for real LiDAR depth.
-    /// Step 4 Generate and Calibration never call this — both of those either have real LiDAR
-    /// depth, or fall back to Vision's own pixel positions too (see `groundPixelJoints` above and
-    /// `worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)`).
-    static func visionEstimatedDepths(from sample: BodyPoseSample) -> [BodyJointName: Float] {
-        var depths: [BodyJointName: Float] = [:]
-        for (joint, local) in sample.rootRelativePositions {
-            let local4 = SIMD4<Float>(local, 1)
-            let cameraSpace4 = sample.cameraOriginMatrix * local4
-            depths[joint] = -cameraSpace4.z
-        }
-        return depths
-    }
-
-    /// Unprojects joints already known in RAW PIXEL space (YOLO's native output) using an
-    /// EXTERNALLY-SUPPLIED per-joint depth instead of a real LiDAR depth buffer — same
-    /// pixel/intrinsics -> camera-space formula as `groundPixelJoints` above (see its comment for
-    /// why this is the right unprojection), but with no depth map to sample from at all. Used only
-    /// by the Estimate 3D hybrid path, paired with `visionEstimatedDepths` as the depth source. A
-    /// joint missing from `depths`, or with a non-positive depth, is simply omitted — same
-    /// "partial result, no all-or-nothing" contract as `groundPixelJoints`.
-    static func unprojectWithExternalDepth(
-        _ pixelJoints: [BodyJointName: CGPoint],
-        depths: [BodyJointName: Float],
-        intrinsics: simd_float3x3
-    ) -> [BodyJointName: SIMD3<Float>] {
-        let fx = intrinsics.columns.0.x
-        let fy = intrinsics.columns.1.y
-        let cx = intrinsics.columns.2.x
-        let cy = intrinsics.columns.2.y
-
-        var grounded: [BodyJointName: SIMD3<Float>] = [:]
-        for (joint, pixel) in pixelJoints {
-            guard let depth = depths[joint], depth > 0 else { continue }
-            let u = Float(pixel.x)
-            let v = Float(pixel.y)
-            let xCV = (u - cx) * depth / fx
-            let yCV = (v - cy) * depth / fy
-            grounded[joint] = SIMD3<Float>(xCV, -yCV, -depth)
-        }
-        return grounded
     }
 
     /// Grounds every joint in `positions` in real LiDAR depth. Returns nil — never a PARTIAL

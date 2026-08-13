@@ -20,9 +20,6 @@
 		5BC89B0018DFA992C840FFAD /* PresetPoseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */; };
 		66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF324A61D6564EBD9F31224A /* LiDARSupport.swift */; };
 		66CE1EA398DC4E5AA29D3BEC /* RecordedFrameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */; };
-		6851B6E3302B6ACD00940510 /* UltralyticsYOLO in Frameworks */ = {isa = PBXBuildFile; productRef = 6851B6E2302B6ACD00940510 /* UltralyticsYOLO */; };
-		6851B6E7302B995E00940510 /* yolo11n-pose.mlmodel in Sources */ = {isa = PBXBuildFile; fileRef = 6851B6E6302B995E00940510 /* yolo11n-pose.mlmodel */; };
-		6851B6EB302C03B900940510 /* yolo26n-pose 3.mlpackage in Sources */ = {isa = PBXBuildFile; fileRef = 6851B6EA302C03B900940510 /* yolo26n-pose 3.mlpackage */; };
 		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
 		6BD548FD4A31899A3F47446B /* TPoseSilhouette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 391284EDC359551A4E55B989 /* TPoseSilhouette.swift */; };
 		7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */; };
@@ -54,7 +51,6 @@
 		F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */; };
 		F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */; };
 		F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5512CAFDE841AFB01DCEDF /* SessionFileStore.swift */; };
-		F6F0110D55B74C9932052F58 /* YOLOBodyPoseDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1F81AF2232756F56D20D0FE /* YOLOBodyPoseDetector.swift */; };
 		FB313179967F4677B6B6ED17 /* CalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81080E72F2B143F29150BDDE /* CalibrationView.swift */; };
 /* End PBXBuildFile section */
 
@@ -78,8 +74,6 @@
 		4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPose3DExtractor.swift; sourceTree = "<group>"; };
 		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
 		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
-		6851B6E6302B995E00940510 /* yolo11n-pose.mlmodel */ = {isa = PBXFileReference; lastKnownFileType = file.mlmodel; path = "yolo11n-pose.mlmodel"; sourceTree = "<group>"; };
-		6851B6EA302C03B900940510 /* yolo26n-pose 3.mlpackage */ = {isa = PBXFileReference; lastKnownFileType = folder.mlpackage; path = "yolo26n-pose 3.mlpackage"; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		81080E72F2B143F29150BDDE /* CalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationView.swift; sourceTree = "<group>"; };
 		842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionView.swift; sourceTree = "<group>"; };
@@ -100,7 +94,6 @@
 		C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPoseLibrary.swift; sourceTree = "<group>"; };
 		CD60C283C01847C79E70DCB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CDC3371247FC4A41A1F41C0F /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
-		D1F81AF2232756F56D20D0FE /* YOLOBodyPoseDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = YOLOBodyPoseDetector.swift; sourceTree = "<group>"; };
 		D2167F61F9A0468293617CE7 /* PlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
 		D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionSceneView.swift; sourceTree = "<group>"; };
 		D861829D58114A9AADE83B96 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
@@ -116,7 +109,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6851B6E3302B6ACD00940510 /* UltralyticsYOLO in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -258,7 +250,6 @@
 				0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */,
 				901F77D623A462E5F44D0125 /* JointDragProjector.swift */,
 				A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */,
-				D1F81AF2232756F56D20D0FE /* YOLOBodyPoseDetector.swift */,
 			);
 			path = PoseReconstruction;
 			sourceTree = "<group>";
@@ -282,8 +273,6 @@
 		B0E8DE97AC814F5FA1113BC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				6851B6E6302B995E00940510 /* yolo11n-pose.mlmodel */,
-				6851B6EA302C03B900940510 /* yolo26n-pose 3.mlpackage */,
 				4627689E22B94DEBB591BB78 /* Assets.xcassets */,
 				017E50A5312541079C0CCA68 /* Info.plist */,
 			);
@@ -407,9 +396,6 @@
 				Base,
 			);
 			mainGroup = 945644852FB444808C4EC84F;
-			packageReferences = (
-				6851B6E1302B6ACD00940510 /* XCRemoteSwiftPackageReference "yolo-ios-app" */,
-			);
 			productRefGroup = A120921418274E2D8E25CD04 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -453,7 +439,6 @@
 				B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */,
 				346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */,
 				7BBD03063E725D612CDFECC5 /* CalibrationScaleCorrection.swift in Sources */,
-				F6F0110D55B74C9932052F58 /* YOLOBodyPoseDetector.swift in Sources */,
 				F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */,
 				742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */,
 				A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */,
@@ -465,14 +450,12 @@
 				B9316A1B2E38406AAC20D572 /* WallScanView.swift in Sources */,
 				9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */,
 				9DD9E21683359D303984C672 /* GripClassifier.swift in Sources */,
-				6851B6E7302B995E00940510 /* yolo11n-pose.mlmodel in Sources */,
 				5BC89B0018DFA992C840FFAD /* PresetPoseLibrary.swift in Sources */,
 				6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */,
 				53EF1FB52F5DEE47476AC704 /* AnnotationOverlay.swift in Sources */,
 				4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */,
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
 				1A5B393845494E32BFE2894E /* RecordingSession.swift in Sources */,
-				6851B6EB302C03B900940510 /* yolo26n-pose 3.mlpackage in Sources */,
 				C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */,
 				F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */,
 				A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */,
@@ -685,25 +668,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		6851B6E1302B6ACD00940510 /* XCRemoteSwiftPackageReference "yolo-ios-app" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/ultralytics/yolo-ios-app";
-			requirement = {
-				branch = main;
-				kind = branch;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		6851B6E2302B6ACD00940510 /* UltralyticsYOLO */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 6851B6E1302B6ACD00940510 /* XCRemoteSwiftPackageReference "yolo-ios-app" */;
-			productName = UltralyticsYOLO;
-		};
-/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 52960A36A2AF450B86F5472C /* Project object */;
 }

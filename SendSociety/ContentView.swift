@@ -358,9 +358,8 @@ private struct ReconstructionHost: View {
                 // Render from these FINAL, calibration-retargeted positions directly, matching the
                 // loaded-saved-entry path above (`initialWorldPositions = existing.worldPositions`).
                 // The old behavior left this unset here, so `ReconstructionView` fell back to
-                // re-deriving positions from `poseSample` — which skips retargeting, and for a
-                // YOLO-generated result is impossible outright since `poseSample` is always nil
-                // there. See `LiveReconstructionGenerator.Result.worldPositions`'s doc comment.
+                // re-deriving positions from `poseSample` — which skips retargeting. See
+                // `LiveReconstructionGenerator.Result.worldPositions`'s doc comment.
                 initialWorldPositions = worldPositions
                 upsertReconstruction()
             }
