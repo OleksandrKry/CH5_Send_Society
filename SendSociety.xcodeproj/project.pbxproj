@@ -8,98 +8,110 @@
 
 /* Begin PBXBuildFile section */
 		05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD60C283C01847C79E70DCB9 /* ContentView.swift */; };
+		1A5B393845494E32BFE2894E /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD86D16F0074C0880EC5727 /* RecordingSession.swift */; };
 		1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3583960B4BA44CB986D33540 /* RecordingView.swift */; };
+		2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */; };
+		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
+		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
+		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
+		4329C0B0302C6FA10036A3D3 /* AnnotateToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */; };
+		439FEFA3302B207C0096DF0A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA2302B20710096DF0A /* Typography.swift */; };
+		439FEFA7302C47750096DF0A /* PlaybackDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA6302C47750096DF0A /* PlaybackDesign.swift */; };
+		439FEFA9302C4B310096DF0A /* ClimbInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA8302C4B310096DF0A /* ClimbInfoCard.swift */; };
+		439FEFB1302C55C70096DF0A /* PlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFB0302C55C70096DF0A /* PlaybackPanel.swift */; };
+		439FEFB3302C56090096DF0A /* PlaybackOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFB2302C56090096DF0A /* PlaybackOverlay.swift */; };
+		4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */; };
+		53EF1FB52F5DEE47476AC704 /* AnnotationOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */; };
 		5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D861829D58114A9AADE83B96 /* DebugLog.swift */; };
+		5BC89B0018DFA992C840FFAD /* PresetPoseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */; };
 		66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF324A61D6564EBD9F31224A /* LiDARSupport.swift */; };
 		66CE1EA398DC4E5AA29D3BEC /* RecordedFrameStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */; };
-		D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230F572E3FAC418F97998530 /* PixelBufferCopy.swift */; };
+		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
+		6BD548FD4A31899A3F47446B /* TPoseSilhouette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 391284EDC359551A4E55B989 /* TPoseSilhouette.swift */; };
 		7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */; };
+		742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */; };
+		75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */; };
+		7BBD03063E725D612CDFECC5 /* CalibrationScaleCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */; };
+		7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */; };
+		84413822E37CD7F0C740DFB0 /* SavedReconstructionReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F7D25D182668360857835C /* SavedReconstructionReviewView.swift */; };
+		8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */; };
+		893831028987895049D28E3F /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0095405D8132C3FB2A4531F2 /* SessionRow.swift */; };
+		9702347BBA1E4DC8BEDFAB0B /* DeviceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */; };
 		9AE9D271DFEB4188832DD8AD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4627689E22B94DEBB591BB78 /* Assets.xcassets */; };
 		9B1B8797B9AB48D784BAD1CB /* ARMeshSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */; };
-		9EE5D285525941919F95D9DF /* ReconstructionEntityBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */; };
-		2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */; };
-		8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */; };
 		9CDFDA505944DE50835DC61A /* CalibrationFrameProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */; };
-		B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */; };
-		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
-		7BBD03063E725D612CDFECC5 /* CalibrationScaleCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */; };
+		9DD9E21683359D303984C672 /* GripClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500D29FCCF4E063083C3AC44 /* GripClassifier.swift */; };
+		9EE5D285525941919F95D9DF /* ReconstructionEntityBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */; };
 		9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */; };
+		A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC77F88F367F475B9C52ADE4 /* SessionStore.swift */; };
 		A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2167F61F9A0468293617CE7 /* PlaybackView.swift */; };
-		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
-		6BD548FD4A31899A3F47446B /* TPoseSilhouette.swift in Sources */ = {isa = PBXBuildFile; fileRef = 391284EDC359551A4E55B989 /* TPoseSilhouette.swift */; };
-		893831028987895049D28E3F /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0095405D8132C3FB2A4531F2 /* SessionRow.swift */; };
-		84413822E37CD7F0C740DFB0 /* SavedReconstructionReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4F7D25D182668360857835C /* SavedReconstructionReviewView.swift */; };
-		742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */; };
+		B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */; };
 		B9316A1B2E38406AAC20D572 /* WallScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EF5A9C90C43485788419CCE /* WallScanView.swift */; };
 		BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11847F3954984489906204D4 /* ARSessionManager.swift */; };
+		C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD01BFB14BE3474B9C27A515 /* WallScanArchive.swift */; };
+		CBBB70CAFB0843AEA722A6CA /* SessionReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */; };
+		D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230F572E3FAC418F97998530 /* PixelBufferCopy.swift */; };
 		D96EA0DEEE064E5AA1092966 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BF999F98834402830605C8 /* Models.swift */; };
 		EDCC3F62192546C2BBF44595 /* CalibrationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1B391AC579C48A5BC7B125E /* CalibrationEngine.swift */; };
 		F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */; };
 		F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */; };
-		FB313179967F4677B6B6ED17 /* CalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81080E72F2B143F29150BDDE /* CalibrationView.swift */; };
-		9DD9E21683359D303984C672 /* GripClassifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 500D29FCCF4E063083C3AC44 /* GripClassifier.swift */; };
-		5BC89B0018DFA992C840FFAD /* PresetPoseLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */; };
-		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
-		53EF1FB52F5DEE47476AC704 /* AnnotationOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */; };
-		4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */; };
-		75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */; };
-		1A5B393845494E32BFE2894E /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD86D16F0074C0880EC5727 /* RecordingSession.swift */; };
-		C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD01BFB14BE3474B9C27A515 /* WallScanArchive.swift */; };
 		F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5512CAFDE841AFB01DCEDF /* SessionFileStore.swift */; };
-		A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC77F88F367F475B9C52ADE4 /* SessionStore.swift */; };
-		CBBB70CAFB0843AEA722A6CA /* SessionReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */; };
-		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
-		7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */; };
-		9702347BBA1E4DC8BEDFAB0B /* DeviceDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */; };
+		FB313179967F4677B6B6ED17 /* CalibrationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81080E72F2B143F29150BDDE /* CalibrationView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0095405D8132C3FB2A4531F2 /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
 		017E50A5312541079C0CCA68 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationHeightCorrection.swift; sourceTree = "<group>"; };
 		11847F3954984489906204D4 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
+		1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationOverlay.swift; sourceTree = "<group>"; };
+		173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionReviewView.swift; sourceTree = "<group>"; };
 		1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendSocietyApp.swift; sourceTree = "<group>"; };
+		20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableSIMD.swift; sourceTree = "<group>"; };
+		230F572E3FAC418F97998530 /* PixelBufferCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBufferCopy.swift; sourceTree = "<group>"; };
 		27E4A34523354A76B854D9EF /* SendSociety.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SendSociety.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2EF5A9C90C43485788419CCE /* WallScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallScanView.swift; sourceTree = "<group>"; };
 		3583960B4BA44CB986D33540 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeshSceneView.swift; sourceTree = "<group>"; };
+		391284EDC359551A4E55B989 /* TPoseSilhouette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPoseSilhouette.swift; sourceTree = "<group>"; };
 		42BF999F98834402830605C8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotateToolbar.swift; sourceTree = "<group>"; };
+		439FEFA2302B20710096DF0A /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
+		439FEFA6302C47750096DF0A /* PlaybackDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackDesign.swift; sourceTree = "<group>"; };
+		439FEFA8302C4B310096DF0A /* ClimbInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimbInfoCard.swift; sourceTree = "<group>"; };
+		439FEFB0302C55C70096DF0A /* PlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPanel.swift; sourceTree = "<group>"; };
+		439FEFB2302C56090096DF0A /* PlaybackOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackOverlay.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPose3DExtractor.swift; sourceTree = "<group>"; };
+		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
+		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		81080E72F2B143F29150BDDE /* CalibrationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationView.swift; sourceTree = "<group>"; };
 		842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionView.swift; sourceTree = "<group>"; };
-		B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedFrameStore.swift; sourceTree = "<group>"; };
-		230F572E3FAC418F97998530 /* PixelBufferCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBufferCopy.swift; sourceTree = "<group>"; };
-		BF324A61D6564EBD9F31224A /* LiDARSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiDARSupport.swift; sourceTree = "<group>"; };
-		CD60C283C01847C79E70DCB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		D2167F61F9A0468293617CE7 /* PlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
-		9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackModel.swift; sourceTree = "<group>"; };
-		391284EDC359551A4E55B989 /* TPoseSilhouette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPoseSilhouette.swift; sourceTree = "<group>"; };
-		0095405D8132C3FB2A4531F2 /* SessionRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionRow.swift; sourceTree = "<group>"; };
-		A4F7D25D182668360857835C /* SavedReconstructionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedReconstructionReviewView.swift; sourceTree = "<group>"; };
-		D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionSceneView.swift; sourceTree = "<group>"; };
-		D861829D58114A9AADE83B96 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
-		E1B391AC579C48A5BC7B125E /* CalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationEngine.swift; sourceTree = "<group>"; };
-		F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionEntityBuilder.swift; sourceTree = "<group>"; };
-		C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionEstimator.swift; sourceTree = "<group>"; };
-		B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReconstructionGenerator.swift; sourceTree = "<group>"; };
-		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
-		0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationHeightCorrection.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
+		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
+		9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameExtractor.swift; sourceTree = "<group>"; };
+		9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackModel.swift; sourceTree = "<group>"; };
+		A4F7D25D182668360857835C /* SavedReconstructionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SavedReconstructionReviewView.swift; sourceTree = "<group>"; };
 		A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationScaleCorrection.swift; sourceTree = "<group>"; };
-		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
-		C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPoseLibrary.swift; sourceTree = "<group>"; };
-		F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonPoseEditor.swift; sourceTree = "<group>"; };
-		1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationOverlay.swift; sourceTree = "<group>"; };
-		BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentity.swift; sourceTree = "<group>"; };
-		20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableSIMD.swift; sourceTree = "<group>"; };
-		FCD86D16F0074C0880EC5727 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 		AD01BFB14BE3474B9C27A515 /* WallScanArchive.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WallScanArchive.swift; sourceTree = "<group>"; };
 		AD5512CAFDE841AFB01DCEDF /* SessionFileStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionFileStore.swift; sourceTree = "<group>"; };
-		DC77F88F367F475B9C52ADE4 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
-		173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionReviewView.swift; sourceTree = "<group>"; };
+		B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordedFrameStore.swift; sourceTree = "<group>"; };
+		B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveReconstructionGenerator.swift; sourceTree = "<group>"; };
+		BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserIdentity.swift; sourceTree = "<group>"; };
+		BF324A61D6564EBD9F31224A /* LiDARSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiDARSupport.swift; sourceTree = "<group>"; };
+		C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionEstimator.swift; sourceTree = "<group>"; };
+		C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PresetPoseLibrary.swift; sourceTree = "<group>"; };
+		CD60C283C01847C79E70DCB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CDC3371247FC4A41A1F41C0F /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
-		9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoFrameExtractor.swift; sourceTree = "<group>"; };
-		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
+		D2167F61F9A0468293617CE7 /* PlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
+		D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionSceneView.swift; sourceTree = "<group>"; };
+		D861829D58114A9AADE83B96 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
+		DC77F88F367F475B9C52ADE4 /* SessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStore.swift; sourceTree = "<group>"; };
+		E1B391AC579C48A5BC7B125E /* CalibrationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationEngine.swift; sourceTree = "<group>"; };
+		F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionEntityBuilder.swift; sourceTree = "<group>"; };
+		F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonPoseEditor.swift; sourceTree = "<group>"; };
+		FCD86D16F0074C0880EC5727 /* RecordingSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSession.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,29 +125,12 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		41F75D8BD2244A8FB1682FD2 /* Reconstruction */ = {
+		067F75C06CA065B0A83984A2 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
-				358F98F5A91CBC675D091BA1 /* Pages */,
-				26F50DCE09913BC0078E5F09 /* Components */,
-			);
-			path = Reconstruction;
-			sourceTree = "<group>";
-		};
-		358F98F5A91CBC675D091BA1 /* Pages */ = {
-			isa = PBXGroup;
-			children = (
-				842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */,
+				81080E72F2B143F29150BDDE /* CalibrationView.swift */,
 			);
 			path = Pages;
-			sourceTree = "<group>";
-		};
-		26F50DCE09913BC0078E5F09 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */,
-			);
-			path = Components;
 			sourceTree = "<group>";
 		};
 		0746646AA5084C3CA66D90F6 /* Library */ = {
@@ -145,6 +140,14 @@
 				3D3A1233D446F50B37DDB448 /* Components */,
 			);
 			path = Library;
+			sourceTree = "<group>";
+		};
+		26F50DCE09913BC0078E5F09 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */,
+			);
+			path = Components;
 			sourceTree = "<group>";
 		};
 		277A11A435994C7C21BE7A93 /* Pages */ = {
@@ -157,12 +160,55 @@
 			path = Pages;
 			sourceTree = "<group>";
 		};
+		2B883D25CF86451EA38202AA /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */,
+				1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */,
+				9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		358F98F5A91CBC675D091BA1 /* Pages */ = {
+			isa = PBXGroup;
+			children = (
+				842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */,
+			);
+			path = Pages;
+			sourceTree = "<group>";
+		};
 		3D3A1233D446F50B37DDB448 /* Components */ = {
 			isa = PBXGroup;
 			children = (
 				0095405D8132C3FB2A4531F2 /* SessionRow.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		41F75D8BD2244A8FB1682FD2 /* Reconstruction */ = {
+			isa = PBXGroup;
+			children = (
+				358F98F5A91CBC675D091BA1 /* Pages */,
+				26F50DCE09913BC0078E5F09 /* Components */,
+			);
+			path = Reconstruction;
+			sourceTree = "<group>";
+		};
+		45DBED7D5B364B98B63C4143 /* WallScan */ = {
+			isa = PBXGroup;
+			children = (
+				A9CFFD8FEF82A8176E34D7D9 /* Pages */,
+			);
+			path = WallScan;
+			sourceTree = "<group>";
+		};
+		832A34B5D1194C9A8D3DDB9D /* Recording */ = {
+			isa = PBXGroup;
+			children = (
+				D85CCAB55A88FB7D404872C9 /* Pages */,
+			);
+			path = Recording;
 			sourceTree = "<group>";
 		};
 		84F89BFA6AC94AB09ECF5216 /* Persistence */ = {
@@ -177,37 +223,17 @@
 			path = Persistence;
 			sourceTree = "<group>";
 		};
-		45DBED7D5B364B98B63C4143 /* WallScan */ = {
+		8F58071BC38A4B6DB9D8008A /* Capture */ = {
 			isa = PBXGroup;
 			children = (
-				A9CFFD8FEF82A8176E34D7D9 /* Pages */,
+				11847F3954984489906204D4 /* ARSessionManager.swift */,
+				B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */,
+				230F572E3FAC418F97998530 /* PixelBufferCopy.swift */,
+				9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */,
+				923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */,
+				6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */,
 			);
-			path = WallScan;
-			sourceTree = "<group>";
-		};
-		A9CFFD8FEF82A8176E34D7D9 /* Pages */ = {
-			isa = PBXGroup;
-			children = (
-				2EF5A9C90C43485788419CCE /* WallScanView.swift */,
-			);
-			path = Pages;
-			sourceTree = "<group>";
-		};
-		832A34B5D1194C9A8D3DDB9D /* Recording */ = {
-			isa = PBXGroup;
-			children = (
-				D85CCAB55A88FB7D404872C9 /* Pages */,
-			);
-			path = Recording;
-			sourceTree = "<group>";
-		};
-		D85CCAB55A88FB7D404872C9 /* Pages */ = {
-			isa = PBXGroup;
-			children = (
-				D2167F61F9A0468293617CE7 /* PlaybackView.swift */,
-				3583960B4BA44CB986D33540 /* RecordingView.swift */,
-			);
-			path = Pages;
+			path = Capture;
 			sourceTree = "<group>";
 		};
 		945644852FB444808C4EC84F = {
@@ -218,6 +244,25 @@
 			);
 			sourceTree = "<group>";
 		};
+		9C3D9E1AAF5B4E2A9C0F7B31 /* PoseReconstruction */ = {
+			isa = PBXGroup;
+			children = (
+				4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */,
+				E1B391AC579C48A5BC7B125E /* CalibrationEngine.swift */,
+				500D29FCCF4E063083C3AC44 /* GripClassifier.swift */,
+				F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */,
+				C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */,
+				F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */,
+				C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */,
+				B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */,
+				4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */,
+				0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */,
+				901F77D623A462E5F44D0125 /* JointDragProjector.swift */,
+				A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */,
+			);
+			path = PoseReconstruction;
+			sourceTree = "<group>";
+		};
 		A120921418274E2D8E25CD04 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -226,9 +271,18 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		A9CFFD8FEF82A8176E34D7D9 /* Pages */ = {
+			isa = PBXGroup;
+			children = (
+				2EF5A9C90C43485788419CCE /* WallScanView.swift */,
+			);
+			path = Pages;
+			sourceTree = "<group>";
+		};
 		B0E8DE97AC814F5FA1113BC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				439FEFA2302B20710096DF0A /* Typography.swift */,
 				4627689E22B94DEBB591BB78 /* Assets.xcassets */,
 				017E50A5312541079C0CCA68 /* Info.plist */,
 			);
@@ -242,14 +296,6 @@
 				BEEFC55733FA8D500BEB20FE /* Components */,
 			);
 			path = Calibration;
-			sourceTree = "<group>";
-		};
-		067F75C06CA065B0A83984A2 /* Pages */ = {
-			isa = PBXGroup;
-			children = (
-				81080E72F2B143F29150BDDE /* CalibrationView.swift */,
-			);
-			path = Pages;
 			sourceTree = "<group>";
 		};
 		BEEFC55733FA8D500BEB20FE /* Components */ = {
@@ -274,36 +320,18 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
-		9C3D9E1AAF5B4E2A9C0F7B31 /* PoseReconstruction */ = {
+		D85CCAB55A88FB7D404872C9 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
-				4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */,
-				E1B391AC579C48A5BC7B125E /* CalibrationEngine.swift */,
-				500D29FCCF4E063083C3AC44 /* GripClassifier.swift */,
-				F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */,
-				C70C179D242FE463AFF86875 /* PresetPoseLibrary.swift */,
-				F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */,
-				C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */,
-				B54C3800B9FD774614701AD6 /* LiveReconstructionGenerator.swift */,
-				4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */,
-				0EBB4EBA643658F6575DCBD1 /* CalibrationHeightCorrection.swift */,
-				901F77D623A462E5F44D0125 /* JointDragProjector.swift */,
-				A6FCA8611CAB27D1385ADE9F /* CalibrationScaleCorrection.swift */,
+				4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */,
+				D2167F61F9A0468293617CE7 /* PlaybackView.swift */,
+				3583960B4BA44CB986D33540 /* RecordingView.swift */,
+				439FEFA6302C47750096DF0A /* PlaybackDesign.swift */,
+				439FEFA8302C4B310096DF0A /* ClimbInfoCard.swift */,
+				439FEFB0302C55C70096DF0A /* PlaybackPanel.swift */,
+				439FEFB2302C56090096DF0A /* PlaybackOverlay.swift */,
 			);
-			path = PoseReconstruction;
-			sourceTree = "<group>";
-		};
-		8F58071BC38A4B6DB9D8008A /* Capture */ = {
-			isa = PBXGroup;
-			children = (
-				11847F3954984489906204D4 /* ARSessionManager.swift */,
-				B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */,
-				230F572E3FAC418F97998530 /* PixelBufferCopy.swift */,
-				9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */,
-				923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */,
-				6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */,
-			);
-			path = Capture;
+			path = Pages;
 			sourceTree = "<group>";
 		};
 		DA503DBA94B84CF89FE3BBF5 /* Features */ = {
@@ -319,24 +347,6 @@
 			path = Features;
 			sourceTree = "<group>";
 		};
-		F3058A7FD2419F0BEA0A4696 /* Shared */ = {
-			isa = PBXGroup;
-			children = (
-				2B883D25CF86451EA38202AA /* Components */,
-			);
-			path = Shared;
-			sourceTree = "<group>";
-		};
-		2B883D25CF86451EA38202AA /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */,
-				1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */,
-				9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
 		DCC4545EE6244131AD317726 /* SendSociety */ = {
 			isa = PBXGroup;
 			children = (
@@ -347,6 +357,14 @@
 				B0E8DE97AC814F5FA1113BC7 /* Resources */,
 			);
 			path = SendSociety;
+			sourceTree = "<group>";
+		};
+		F3058A7FD2419F0BEA0A4696 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				2B883D25CF86451EA38202AA /* Components */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -423,12 +441,14 @@
 				F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */,
 				EDCC3F62192546C2BBF44595 /* CalibrationEngine.swift in Sources */,
 				5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */,
+				439FEFB1302C55C70096DF0A /* PlaybackPanel.swift in Sources */,
 				66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */,
 				D96EA0DEEE064E5AA1092966 /* Models.swift in Sources */,
 				66CE1EA398DC4E5AA29D3BEC /* RecordedFrameStore.swift in Sources */,
 				D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */,
 				FB313179967F4677B6B6ED17 /* CalibrationView.swift in Sources */,
 				6BD548FD4A31899A3F47446B /* TPoseSilhouette.swift in Sources */,
+				439FEFA7302C47750096DF0A /* PlaybackDesign.swift in Sources */,
 				9EE5D285525941919F95D9DF /* ReconstructionEntityBuilder.swift in Sources */,
 				2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */,
 				8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */,
@@ -441,13 +461,17 @@
 				A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */,
 				384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */,
 				1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */,
+				439FEFB3302C56090096DF0A /* PlaybackOverlay.swift in Sources */,
 				7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */,
+				439FEFA3302B207C0096DF0A /* Typography.swift in Sources */,
 				9B1B8797B9AB48D784BAD1CB /* ARMeshSceneView.swift in Sources */,
 				B9316A1B2E38406AAC20D572 /* WallScanView.swift in Sources */,
 				9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */,
 				9DD9E21683359D303984C672 /* GripClassifier.swift in Sources */,
 				5BC89B0018DFA992C840FFAD /* PresetPoseLibrary.swift in Sources */,
+				439FEFA9302C4B310096DF0A /* ClimbInfoCard.swift in Sources */,
 				6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */,
+				4329C0B0302C6FA10036A3D3 /* AnnotateToolbar.swift in Sources */,
 				53EF1FB52F5DEE47476AC704 /* AnnotationOverlay.swift in Sources */,
 				4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */,
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
@@ -593,7 +617,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = 2LRF7RJ5XQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -621,7 +645,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = 2LRF7RJ5XQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
