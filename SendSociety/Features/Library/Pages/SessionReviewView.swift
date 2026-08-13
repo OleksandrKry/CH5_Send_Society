@@ -128,11 +128,19 @@ struct SessionReviewView: View {
                                 .padding(.bottom, 12)
                         }
                     }
+                } else if !isPreviewingSkeleton, !model.isPlaying, !annotationState.strokes.isEmpty {
+                    // Auto-preview: same reasoning as `PlaybackView` — a saved annotation within
+                    // ±1s of wherever the scrubber landed shows up on its own, read-only
+                    // (`isInteractive: false`), without needing "Annotate" tapped first. Skipped
+                    // while the skeleton preview is showing (that view already replaces the video
+                    // player entirely — see the `ZStack`'s first branch above) so this doesn't draw
+                    // stale markup over an unrelated still frame.
+                    AnnotationOverlay(state: annotationState, isInteractive: false)
                 }
             }
 
             VStack(spacing: 12) {
-                reconstructionMarkerTrack
+                savedMomentMarkerTrack
                 Slider(
                     value: Binding(
                         get: { model.currentTime },
@@ -410,26 +418,85 @@ struct SessionReviewView: View {
     }
 
     private func loadAnnotationsForCurrentTime() {
-        annotatedTimestamp = model.currentTime
-        let nearest = session.videoAnnotations.first { abs($0.timestampSeconds - model.currentTime) <= 0.3 }
+        loadAnnotations(at: model.currentTime)
+    }
+
+    /// Loads whatever's saved within ±1s of `timestamp` — see `PlaybackView.loadAnnotations(at:)`'s
+    /// doc comment for the full reasoning (same ±1s window, same "explicit timestamp rather than
+    /// racing `model.currentTime`" logic, shared here so `jump(to:)` below can seek and preview a
+    /// tapped marker's annotation reliably).
+    private func loadAnnotations(at timestamp: Double) {
+        annotatedTimestamp = timestamp
+        let nearest = session.videoAnnotations.first { abs($0.timestampSeconds - timestamp) <= 1.0 }
         annotationState.load(strokes: nearest?.strokes ?? [])
     }
 
+    /// One tappable moment on the scrubber's marker track — see `PlaybackView.SavedMoment`'s doc
+    /// comment for the merge reasoning (an annotation within 0.5s of a reconstruction folds into
+    /// that reconstruction's marker rather than showing as a separate dot).
+    private struct SavedMoment: Identifiable {
+        let id: UUID
+        let timestampSeconds: Double
+        let hasAnnotation: Bool
+        let hasReconstruction: Bool
+        let isApproximateReconstruction: Bool
+    }
+
+    private var savedMoments: [SavedMoment] {
+        var moments: [SavedMoment] = session.reconstructions.map {
+            SavedMoment(id: $0.id, timestampSeconds: $0.timestampSeconds, hasAnnotation: false, hasReconstruction: true, isApproximateReconstruction: $0.isApproximate)
+        }
+        for annotation in session.videoAnnotations {
+            if let index = moments.firstIndex(where: { abs($0.timestampSeconds - annotation.timestampSeconds) <= 0.5 }) {
+                let existing = moments[index]
+                moments[index] = SavedMoment(id: existing.id, timestampSeconds: existing.timestampSeconds, hasAnnotation: true, hasReconstruction: existing.hasReconstruction, isApproximateReconstruction: existing.isApproximateReconstruction)
+            } else {
+                moments.append(SavedMoment(id: annotation.id, timestampSeconds: annotation.timestampSeconds, hasAnnotation: true, hasReconstruction: false, isApproximateReconstruction: false))
+            }
+        }
+        return moments.sorted { $0.timestampSeconds < $1.timestampSeconds }
+    }
+
+    /// Seeks straight to `moment`'s timestamp and shows whatever it has: a reconstruction opens
+    /// `SavedReconstructionReviewView` directly (via `reviewingEntry`'s existing
+    /// `.fullScreenCover(item:)` below) using the EXACT saved entry (matched by id, not a fresh
+    /// nearby-lookup) rather than re-running any detection; an annotation-only moment relies on the
+    /// auto-preview above to show its strokes once the seek lands (paused, since
+    /// `PlaybackModel.seek(to:)` always pauses first).
+    private func jump(to moment: SavedMoment) {
+        model.seek(to: moment.timestampSeconds)
+        loadAnnotations(at: moment.timestampSeconds)
+        if moment.hasReconstruction, let entry = session.reconstructions.first(where: { $0.id == moment.id }) {
+            reviewingEntry = entry
+        }
+    }
+
+    /// Tappable markers for every saved moment — see `PlaybackView.savedMomentMarkerTrack`'s doc
+    /// comment for the full "larger and clickable" reasoning; same icon/color scheme here.
     @ViewBuilder
-    private var reconstructionMarkerTrack: some View {
-        if !session.reconstructions.isEmpty, model.duration > 0 {
+    private var savedMomentMarkerTrack: some View {
+        if !savedMoments.isEmpty, model.duration > 0 {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    ForEach(session.reconstructions) { entry in
-                        let fraction = min(max(entry.timestampSeconds / model.duration, 0), 1)
-                        Circle()
-                            .fill(entry.isApproximate ? Color.orange : Color.teal)
-                            .frame(width: 6, height: 6)
-                            .offset(x: geometry.size.width * fraction - 3)
+                    ForEach(savedMoments) { moment in
+                        let fraction = min(max(moment.timestampSeconds / model.duration, 0), 1)
+                        Button {
+                            jump(to: moment)
+                        } label: {
+                            Image(systemName: moment.hasReconstruction ? "cube.fill" : "pencil.tip.crop.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white)
+                                .frame(width: 26, height: 26)
+                                .background(
+                                    (moment.hasReconstruction ? (moment.isApproximateReconstruction ? Color.orange : Color.teal) : Color.orange),
+                                    in: Circle()
+                                )
+                        }
+                        .offset(x: geometry.size.width * fraction - 13)
                     }
                 }
             }
-            .frame(height: 8)
+            .frame(height: 26)
         }
     }
 }

@@ -50,12 +50,20 @@ struct PlaybackView: View {
                                 .padding(.bottom, 12)
                         }
                     }
+                } else if !model.isPlaying, !annotationState.strokes.isEmpty {
+                    // Auto-preview: a saved annotation within ±1s of wherever the scrubber landed
+                    // (see `loadAnnotationsForCurrentTime()`) shows up on its own the moment
+                    // playback pauses nearby — the coach shouldn't have to remember to tap
+                    // "Annotate" just to SEE markup that's already there. `isInteractive: false`
+                    // keeps this read-only so it doesn't steal the tap that's meant for the Play
+                    // button, the Generate button, or a marker underneath.
+                    AnnotationOverlay(state: annotationState, isInteractive: false)
                 }
             }
             .allowsHitTesting(true)
 
             VStack(spacing: 12) {
-                reconstructionMarkerTrack
+                savedMomentMarkerTrack
                 Slider(
                     value: Binding(
                         get: { model.currentTime },
@@ -120,34 +128,102 @@ struct PlaybackView: View {
     }
 
     private func loadAnnotationsForCurrentTime() {
-        annotatedTimestamp = model.currentTime
+        loadAnnotations(at: model.currentTime)
+    }
+
+    /// Loads whatever's saved within ±1s of `timestamp` — the "by default the saved annotation
+    /// will appear if user move the movie slider +- 1 second in that time frame" window, per the
+    /// coach's own request. Takes an explicit `timestamp` (rather than always reading
+    /// `model.currentTime` itself) so `jump(to:)` can load the RIGHT annotation for the marker it
+    /// just seeked to without waiting on `model.currentTime` to catch up — `PlaybackModel`'s
+    /// `currentTime` only updates via its periodic (~30x/sec) time observer once the underlying
+    /// `AVPlayer` seek actually completes, which is asynchronous and hasn't necessarily happened
+    /// yet in the same run-loop turn as the tap that triggered it.
+    private func loadAnnotations(at timestamp: Double) {
+        annotatedTimestamp = timestamp
         guard let session else {
             annotationState.load(strokes: [])
             return
         }
-        let nearest = session.videoAnnotations.first { abs($0.timestampSeconds - model.currentTime) <= 0.3 }
+        let nearest = session.videoAnnotations.first { abs($0.timestampSeconds - timestamp) <= 1.0 }
         annotationState.load(strokes: nearest?.strokes ?? [])
     }
 
-    /// Small dots along the scrubber's track marking timestamps that already have a saved 3D
-    /// reconstruction — approximate positioning via `GeometryReader` (the same 0...duration range
-    /// the `Slider` above uses), not pixel-perfect alignment with the Slider's own thumb track,
-    /// but close enough to clearly communicate "generated moments are around here."
+    /// One tappable moment on the scrubber's marker track — either a saved 3D reconstruction, a
+    /// saved annotation, or (common case) both at once, merged into a single marker per
+    /// `savedMoments` so the coach isn't looking at two overlapping dots for what's really one
+    /// moment they marked up.
+    private struct SavedMoment: Identifiable {
+        let id: UUID
+        let timestampSeconds: Double
+        let hasAnnotation: Bool
+        let hasReconstruction: Bool
+        let isApproximateReconstruction: Bool
+    }
+
+    /// Merges `session.reconstructions` and `session.videoAnnotations` into one marker list —
+    /// an annotation within 0.5s of a reconstruction is folded into that reconstruction's marker
+    /// (the reconstruction is the richer artifact and anchors the timestamp shown); anything else
+    /// becomes its own annotation-only marker. Sorted by time purely so marker ordering on screen
+    /// is stable/predictable.
+    private var savedMoments: [SavedMoment] {
+        guard let session else { return [] }
+        var moments: [SavedMoment] = session.reconstructions.map {
+            SavedMoment(id: $0.id, timestampSeconds: $0.timestampSeconds, hasAnnotation: false, hasReconstruction: true, isApproximateReconstruction: $0.isApproximate)
+        }
+        for annotation in session.videoAnnotations {
+            if let index = moments.firstIndex(where: { abs($0.timestampSeconds - annotation.timestampSeconds) <= 0.5 }) {
+                let existing = moments[index]
+                moments[index] = SavedMoment(id: existing.id, timestampSeconds: existing.timestampSeconds, hasAnnotation: true, hasReconstruction: existing.hasReconstruction, isApproximateReconstruction: existing.isApproximateReconstruction)
+            } else {
+                moments.append(SavedMoment(id: annotation.id, timestampSeconds: annotation.timestampSeconds, hasAnnotation: true, hasReconstruction: false, isApproximateReconstruction: false))
+            }
+        }
+        return moments.sorted { $0.timestampSeconds < $1.timestampSeconds }
+    }
+
+    /// Seeks straight to `moment`'s timestamp and shows whatever it has: a reconstruction jumps
+    /// straight into Step 4's 3D view via `onGenerate` (which loads the EXACT saved entry rather
+    /// than re-running Vision — see `ContentView.ReconstructionHost.generate()`'s near-enough-saved
+    /// check), while an annotation-only moment relies on the auto-preview above to show its strokes
+    /// once the seek lands (paused, since `PlaybackModel.seek(to:)` always pauses first).
+    private func jump(to moment: SavedMoment) {
+        model.seek(to: moment.timestampSeconds)
+        loadAnnotations(at: moment.timestampSeconds)
+        if moment.hasReconstruction {
+            onGenerate(url, frameStore, moment.timestampSeconds)
+        }
+    }
+
+    /// Tappable markers along the scrubber's track for every saved moment (3D reconstruction
+    /// and/or annotation) — larger and directly tappable (feedback: "make it larger and
+    /// clickable... when clicking that circle, it show go to the specific time frame directly"),
+    /// unlike the old plain 6pt display-only dots. Cube icon/teal = has a 3D reconstruction
+    /// (orange tint if it's an approximate/estimated one), pencil icon/orange = annotation only.
     @ViewBuilder
-    private var reconstructionMarkerTrack: some View {
-        if let session, !session.reconstructions.isEmpty, model.duration > 0 {
+    private var savedMomentMarkerTrack: some View {
+        if !savedMoments.isEmpty, model.duration > 0 {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    ForEach(session.reconstructions) { entry in
-                        let fraction = min(max(entry.timestampSeconds / model.duration, 0), 1)
-                        Circle()
-                            .fill(Color.teal)
-                            .frame(width: 6, height: 6)
-                            .offset(x: geometry.size.width * fraction - 3)
+                    ForEach(savedMoments) { moment in
+                        let fraction = min(max(moment.timestampSeconds / model.duration, 0), 1)
+                        Button {
+                            jump(to: moment)
+                        } label: {
+                            Image(systemName: moment.hasReconstruction ? "cube.fill" : "pencil.tip.crop.circle.fill")
+                                .font(.system(size: 15))
+                                .foregroundStyle(.white)
+                                .frame(width: 26, height: 26)
+                                .background(
+                                    (moment.hasReconstruction ? (moment.isApproximateReconstruction ? Color.orange : Color.teal) : Color.orange),
+                                    in: Circle()
+                                )
+                        }
+                        .offset(x: geometry.size.width * fraction - 13)
                     }
                 }
             }
-            .frame(height: 8)
+            .frame(height: 26)
         }
     }
 }

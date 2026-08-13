@@ -172,7 +172,7 @@ struct ReconstructionView: View {
                         .foregroundStyle(.secondary)
                 }
                 if isEditingPose {
-                    Text("Drag a joint to correct it — connected limbs move with it, and movement is limited to roughly what a real joint allows.")
+                    Text("Tap a joint to select it — the camera locks and the joint highlights. Drag near it to correct it (connected limbs move with it, limited to roughly what a real joint allows). Tap elsewhere to finish, or tap another joint to switch.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else if isAnnotating {

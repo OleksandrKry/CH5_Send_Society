@@ -20,8 +20,11 @@ struct ReconstructionSceneView: UIViewRepresentable {
     /// The coach's manually-edited pose, if any — nil means "show the auto-detected pose."
     /// Written by the Coordinator when a drag ends; set back to nil externally by "Reset Pose."
     @Binding var jointOverrides: [BodyJointName: SIMD3<Float>]?
-    /// The joint currently mid-drag, if any — read by `ReconstructionView` only for potential
-    /// future UI (e.g. naming which joint is selected); not required for the core feature to work.
+    /// The joint currently SELECTED (tapped, camera-locked, highlighted), if any — set the moment
+    /// a joint is tapped and cleared only when the coach taps outside its radius, NOT just while a
+    /// drag is actively happening — see `Coordinator.handleJointTouch`'s doc comment for the full
+    /// state machine. Read by `ReconstructionView` only for potential future UI (e.g. naming which
+    /// joint is selected); not required for the core feature to work.
     @Binding var draggedJoint: BodyJointName?
     @Binding var hasEditedPose: Bool
     /// Already depth-grounded positions to use as the baseline instead of computing from
@@ -117,6 +120,20 @@ struct ReconstructionSceneView: UIViewRepresentable {
         // one-finger rotate.
         pan.maximumNumberOfTouches = 1
         view.addGestureRecognizer(pan)
+
+        // Drives the tap-to-select / drag-within-radius / tap-outside-to-finish joint editing
+        // state machine — see `Coordinator.handleJointTouch`'s doc comment for why this needs to
+        // be a `UILongPressGestureRecognizer` with zero minimum duration rather than reusing
+        // `pan` above: a plain tap (finger down, then up, with no movement) never crosses
+        // `UIPanGestureRecognizer`'s own movement threshold, so it would never even report
+        // `.began` — this recognizer reports `.began` the instant the finger touches down,
+        // capturing a pure tap AND a drag through the same callback. Only claims touches while
+        // `isEditingPose` is true (see `gestureRecognizerShouldBegin`) — `pan` above handles
+        // ordinary orbiting the rest of the time, unchanged.
+        let jointTouch = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleJointTouch(_:)))
+        jointTouch.minimumPressDuration = 0
+        jointTouch.delegate = context.coordinator
+        view.addGestureRecognizer(jointTouch)
 
         // Two-finger drag = pan (translate the view), one-finger = rotate, pinch = zoom — the
         // exact gesture set SceneKit's `allowsCameraControl` and AR Quick Look's "Object mode"
@@ -247,7 +264,7 @@ struct ReconstructionSceneView: UIViewRepresentable {
         return atan2(horizontal.x, horizontal.y)
     }
 
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         /// Reference back to the current SwiftUI struct instance — reassigned at the top of every
         /// `makeUIView`/`updateUIView` call, since SwiftUI creates a fresh `ReconstructionSceneView`
         /// value on every body re-evaluation. Standard UIViewRepresentable bridging pattern.
@@ -271,11 +288,31 @@ struct ReconstructionSceneView: UIViewRepresentable {
         /// The live positions actually being rendered — starts equal to `originalPositions` and
         /// only diverges once the coach drags something.
         var currentPositions: [BodyJointName: SIMD3<Float>] = [:]
-        private var draggedJoint: BodyJointName?
+        /// The joint currently SELECTED — persists across separate touches once tapped (step 1 of
+        /// the doc comment on `handleJointTouch`), unlike the old model where lifting the finger
+        /// ended everything. Non-nil for the whole "camera locked, highlighted, waiting for either
+        /// a drag-within-radius or a tap-outside-to-finish" session, not just while actively
+        /// mid-drag.
+        private var selectedJoint: BodyJointName?
+        /// True only while a touch that started WITHIN `selectedJoint`'s radius is actively
+        /// dragging it — distinct from merely having a joint selected (finger could be lifted, or
+        /// resting down without having moved).
+        private var isDraggingSelectedJoint = false
         /// World-space position of the dragged joint at the MOMENT the drag started — this fixes
         /// the depth-from-camera plane the touch point unprojects onto for the rest of the
         /// gesture (see `updateJointDrag`), so the plane doesn't chase the joint as it moves.
         private var dragPlaneAnchor: SIMD3<Float>?
+        /// Screen location of the previous `.changed` callback while orbiting via `handleJointTouch`
+        /// (edit mode, nothing selected yet) — `UILongPressGestureRecognizer` has no built-in
+        /// translation the way `UIPanGestureRecognizer` does, so the frame-to-frame delta is
+        /// tracked manually here.
+        private var lastOrbitTouchLocation: CGPoint?
+        /// Real-world radius (meters) around a joint's CURRENT position that counts as "close
+        /// enough to grab" — see `screenRadius(for:in:)` for how this becomes a perspective-correct
+        /// on-screen hit zone that shrinks/grows with zoom exactly like the joint's actual apparent
+        /// size would, instead of a fixed pixel radius that would feel too generous zoomed out and
+        /// too stingy zoomed in.
+        private let jointSelectionRadius: Float = 0.08
         /// True once a drag has been committed back to `parent.jointOverrides` — lets
         /// `updateUIView` tell "coach tapped Reset Pose" (jointOverrides went nil while this is
         /// true) apart from "no edit has ever happened" (both nil, nothing to do).
@@ -286,35 +323,11 @@ struct ReconstructionSceneView: UIViewRepresentable {
         }
 
         @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
-            guard let view = gesture.view else { return }
-
-            if parent.isEditingPose {
-                switch gesture.state {
-                case .began:
-                    let location = gesture.location(in: view)
-                    if let joint = jointHit(at: location) {
-                        beginJointDrag(joint: joint)
-                        return
-                    }
-                case .changed:
-                    if let draggedJoint {
-                        updateJointDrag(joint: draggedJoint, screenLocation: gesture.location(in: view))
-                        return
-                    }
-                case .ended, .cancelled, .failed:
-                    if draggedJoint != nil {
-                        endJointDrag()
-                        return
-                    }
-                default:
-                    break
-                }
-            }
-
-            // Falls through to ordinary orbit behavior whenever pose-editing is off, or it's on
-            // but this particular gesture didn't start on a joint (e.g. the coach just wants to
-            // look around while in Edit Pose mode) — orbit and joint-drag never run at the same
-            // time, so there's no double-interpretation of the same finger movement.
+            // `handleJointTouch` below owns ALL of edit-mode's interaction, including orbiting
+            // while nothing's selected — this recognizer is only for ordinary orbit outside edit
+            // mode (see `gestureRecognizerShouldBegin`, which keeps `handleJointTouch` from even
+            // claiming a touch while pose-editing is off).
+            guard let view = gesture.view, !parent.isEditingPose else { return }
             let translation = gesture.translation(in: view)
             azimuth -= Float(translation.x) * 0.005
             elevation = max(-1.4, min(1.4, elevation - Float(translation.y) * 0.005))
@@ -322,24 +335,136 @@ struct ReconstructionSceneView: UIViewRepresentable {
             updateCameraTransform()
         }
 
-        /// Hit-tests a screen point against the currently-rendered joint spheres — naming
-        /// convention lives in `ReconstructionEntityBuilder.jointName(fromEntityName:)`, the same
-        /// module that names them in the first place (`skeletonEntity`), so there's exactly one
-        /// place that knows the convention. UNVERIFIED ON DEVICE: `ARView.entity(at:)` is a real,
-        /// documented RealityKit API that works in both AR and non-AR camera modes, but hasn't been
-        /// exercised in this specific scene (mannequin body hidden in edit mode specifically to
-        /// give it a clean shot at the joint spheres — see `hideMannequinBody`).
-        private func jointHit(at location: CGPoint) -> BodyJointName? {
-            guard let arView, let entity = arView.entity(at: location) else { return nil }
-            return ReconstructionEntityBuilder.jointName(fromEntityName: entity.name)
+        /// Only allows `handleJointTouch`'s recognizer to claim a touch while pose-editing is on —
+        /// `pan` above handles ordinary orbiting the rest of the time. Swift's default behavior for
+        /// two unrelated gesture recognizers on the same view is already mutually exclusive (first
+        /// to recognize wins), so this is the only coordination needed between them.
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            parent.isEditingPose
+        }
+
+        /// Drives the tap-to-select / drag-within-radius / tap-outside-to-finish joint editing
+        /// state machine:
+        /// 1. Tap a joint (touch down within its radius, no selection yet) -> selects it.
+        /// 2. Selecting a joint locks the camera (orbit/pan/pinch all check `selectedJoint == nil`
+        ///    — see `handlePinch`/`handleTwoFingerPan`, and the orbit branch below).
+        /// 3. The selected joint stays highlighted for the whole selection, not just mid-drag (see
+        ///    `rebuildSkeleton`'s `selectedJoint`-driven highlight).
+        /// 4. A NEW touch that starts WITHIN the selected joint's radius drags it — the coach can
+        ///    do several separate drags in a row on the same joint without it being deselected.
+        /// 5. A touch OUTSIDE the selected joint's radius, landing on nothing else, finishes
+        ///    editing (commits `currentPositions`, clears the highlight, unlocks the camera).
+        /// 6. A touch OUTSIDE the selected joint's radius that instead lands within ANOTHER
+        ///    joint's radius finishes the first one AND immediately re-enters step 1-3 for the new
+        ///    joint, in one motion — no need for a separate deselect tap first.
+        ///
+        /// `UILongPressGestureRecognizer` with `minimumPressDuration = 0` (not
+        /// `UITapGestureRecognizer` or `UIPanGestureRecognizer`) is what makes ONE recognizer
+        /// report both a pure tap (`.began` immediately followed by `.ended`, no movement) and a
+        /// drag (`.began`, then `.changed` as the finger moves, then `.ended`) — a plain
+        /// `UIPanGestureRecognizer` only reports `.began` once the finger has already moved past
+        /// its own minimum distance, which would silently miss a "tap with no drag at all" select.
+        @objc func handleJointTouch(_ gesture: UILongPressGestureRecognizer) {
+            guard let view = gesture.view else { return }
+            let location = gesture.location(in: view)
+
+            switch gesture.state {
+            case .began:
+                if let selected = selectedJoint {
+                    if withinRadius(selected, at: location) {
+                        beginJointDrag(joint: selected)
+                    } else if let other = jointWithinRadius(at: location, excluding: selected) {
+                        finishEditingSelectedJoint()
+                        selectJoint(other)
+                    } else {
+                        finishEditingSelectedJoint()
+                    }
+                } else if let joint = jointWithinRadius(at: location) {
+                    selectJoint(joint)
+                } else {
+                    lastOrbitTouchLocation = location
+                }
+            case .changed:
+                if isDraggingSelectedJoint, let selected = selectedJoint {
+                    updateJointDrag(joint: selected, screenLocation: location)
+                } else if selectedJoint == nil, let last = lastOrbitTouchLocation {
+                    let dx = Float(location.x - last.x)
+                    let dy = Float(location.y - last.y)
+                    azimuth -= dx * 0.005
+                    elevation = max(-1.4, min(1.4, elevation - dy * 0.005))
+                    lastOrbitTouchLocation = location
+                    updateCameraTransform()
+                }
+                // Else: a joint IS selected but this isn't the drag touch (e.g. the finger is
+                // resting inside the radius without having moved yet) — camera stays locked,
+                // nothing to update.
+            case .ended, .cancelled, .failed:
+                if isDraggingSelectedJoint {
+                    isDraggingSelectedJoint = false
+                    dragPlaneAnchor = nil
+                    // Selection itself is NOT cleared here — lifting the finger after a drag only
+                    // ends THAT drag; the joint stays selected/highlighted/camera-locked until the
+                    // coach taps outside its radius (step 5), so several small adjustments in a
+                    // row don't each need a fresh tap-to-select first.
+                }
+                lastOrbitTouchLocation = nil
+            default:
+                break
+            }
+        }
+
+        /// Screen-space hit radius for `joint` at ITS CURRENT distance from the camera — projects
+        /// both the joint and a point `jointSelectionRadius` meters to its side, so the on-screen
+        /// hit zone naturally shrinks/grows with zoom exactly like the joint's real 3D size would,
+        /// rather than a fixed pixel radius that would feel too generous zoomed out and too stingy
+        /// zoomed in. UNVERIFIED ON DEVICE: `ARView.project(_:)` is a real, documented RealityKit
+        /// API (world point -> 2D view point) — https://developer.apple.com/documentation/realitykit/arview/project(_:)
+        /// — same category of API as `ARView.ray(through:)` already used below.
+        private func screenRadius(for joint: BodyJointName, in view: ARView) -> (center: CGPoint, radius: CGFloat)? {
+            guard let cameraEntity, let worldPosition = currentPositions[joint],
+                  let centerScreen = view.project(worldPosition)
+            else { return nil }
+            let right = cameraEntity.orientation(relativeTo: nil).act(SIMD3<Float>(1, 0, 0))
+            let edgeWorld = worldPosition + right * jointSelectionRadius
+            guard let edgeScreen = view.project(edgeWorld) else { return nil }
+            let pixelRadius = hypot(edgeScreen.x - centerScreen.x, edgeScreen.y - centerScreen.y)
+            // Floored at 24pt (roughly Apple HIG's minimum touch-target radius) so a joint that's
+            // zoomed way out still has a tappable hit zone, not a sub-pixel target.
+            return (centerScreen, max(24, pixelRadius))
+        }
+
+        /// Nearest joint whose radius (see `screenRadius`) contains `location`, if any — "nearest"
+        /// so two overlapping radii (a zoomed-out view with several joints close together) resolve
+        /// to a sensible single choice rather than dictionary-iteration order.
+        private func jointWithinRadius(at location: CGPoint, excluding: BodyJointName? = nil) -> BodyJointName? {
+            guard let arView else { return nil }
+            var best: (joint: BodyJointName, distance: CGFloat)?
+            for joint in currentPositions.keys where joint != excluding {
+                guard let (center, radius) = screenRadius(for: joint, in: arView) else { continue }
+                let distance = hypot(location.x - center.x, location.y - center.y)
+                guard distance <= radius else { continue }
+                if best == nil || distance < best!.distance {
+                    best = (joint, distance)
+                }
+            }
+            return best?.joint
+        }
+
+        private func withinRadius(_ joint: BodyJointName, at location: CGPoint) -> Bool {
+            guard let arView, let (center, radius) = screenRadius(for: joint, in: arView) else { return false }
+            return hypot(location.x - center.x, location.y - center.y) <= radius
+        }
+
+        private func selectJoint(_ joint: BodyJointName) {
+            selectedJoint = joint
+            parent.draggedJoint = joint // outward-facing binding — see its own doc comment
+            rebuildSkeleton() // shows the highlight immediately, before any drag happens
         }
 
         private func beginJointDrag(joint: BodyJointName) {
             guard let startPosition = currentPositions[joint] else { return }
-            draggedJoint = joint
-            parent.draggedJoint = joint
+            isDraggingSelectedJoint = true
             dragPlaneAnchor = startPosition
-            rebuildSkeleton() // shows the highlight immediately, before any actual movement
         }
 
         /// Gets a screen-space ray from `ARView` and the camera's forward vector, then hands off to
@@ -364,13 +489,21 @@ struct ReconstructionSceneView: UIViewRepresentable {
             rebuildSkeleton()
         }
 
-        private func endJointDrag() {
-            draggedJoint = nil
-            parent.draggedJoint = nil
+        /// Ends the current selection session entirely (step 5/6) — commits `currentPositions`
+        /// back to `parent.jointOverrides` ONLY if something actually changed (a plain tap-select-
+        /// then-tap-outside with no drag in between shouldn't mark the pose as edited), then clears
+        /// the highlight and unlocks the camera.
+        private func finishEditingSelectedJoint() {
+            guard selectedJoint != nil else { return }
+            selectedJoint = nil
+            isDraggingSelectedJoint = false
             dragPlaneAnchor = nil
-            parent.jointOverrides = currentPositions
-            parent.hasEditedPose = true
-            hasAppliedOverride = true
+            parent.draggedJoint = nil
+            if currentPositions != originalPositions {
+                parent.jointOverrides = currentPositions
+                parent.hasEditedPose = true
+                hasAppliedOverride = true
+            }
             rebuildSkeleton() // clears the highlight
         }
 
@@ -378,9 +511,10 @@ struct ReconstructionSceneView: UIViewRepresentable {
         /// `parent.jointOverrides` back to nil.
         func resetToOriginal() {
             currentPositions = originalPositions
-            draggedJoint = nil
-            parent.draggedJoint = nil
+            selectedJoint = nil
+            isDraggingSelectedJoint = false
             dragPlaneAnchor = nil
+            parent.draggedJoint = nil
             hasAppliedOverride = false
             rebuildSkeleton()
         }
@@ -408,7 +542,7 @@ struct ReconstructionSceneView: UIViewRepresentable {
             if let skeletonEntityRef {
                 contentAnchor.removeChild(skeletonEntityRef)
             }
-            let highlighted = draggedJoint.map { (joints: SkeletonPoseEditor.impactedJoints(for: $0), bones: SkeletonPoseEditor.impactedBones(for: $0)) }
+            let highlighted = selectedJoint.map { (joints: SkeletonPoseEditor.impactedJoints(for: $0), bones: SkeletonPoseEditor.impactedBones(for: $0)) }
             let newSkeleton = ReconstructionEntityBuilder.skeletonEntity(
                 from: parent.poseSample,
                 cameraTransform: parent.cameraTransform ?? matrix_identity_float4x4,
@@ -424,9 +558,10 @@ struct ReconstructionSceneView: UIViewRepresentable {
         }
 
         /// Pinch to zoom — shrinks/grows the orbit radius. Clamped so you can't zoom through the
-        /// content or pinch out to a speck.
+        /// content or pinch out to a speck. Locked out while a joint is selected — see
+        /// `handleJointTouch`'s doc comment, step 2.
         @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
-            guard gesture.scale.isFinite, gesture.scale > 0 else { return }
+            guard selectedJoint == nil, gesture.scale.isFinite, gesture.scale > 0 else { return }
             radius = min(max(radius / Float(gesture.scale), minRadius), maxRadius)
             gesture.scale = 1
             updateCameraTransform()
@@ -438,7 +573,8 @@ struct ReconstructionSceneView: UIViewRepresentable {
         /// like dragging a photo — matching AR Quick Look's Object mode and SceneKit's
         /// `allowsCameraControl` two-finger pan.
         @objc func handleTwoFingerPan(_ gesture: UIPanGestureRecognizer) {
-            guard let cameraEntity else { return }
+            // Locked out while a joint is selected — see `handleJointTouch`'s doc comment, step 2.
+            guard selectedJoint == nil, let cameraEntity else { return }
             let translation = gesture.translation(in: gesture.view)
             gesture.setTranslation(.zero, in: gesture.view)
 

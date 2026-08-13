@@ -23,23 +23,16 @@ enum ReconstructionEntityBuilder {
 
     // MARK: - Joint entity naming
 
-    /// Every rendered joint sphere (see `skeletonEntity` below) is named `"joint.<rawValue>"` so
-    /// `ReconstructionSceneView.Coordinator`'s Edit Pose drag gesture can hit-test `ARView.entity
-    /// (at:)`'s result back to a `BodyJointName` — this is the one place both the writer (here) and
-    /// the reader (`Coordinator.jointHit`) agree on that naming convention, so it's never duplicated
-    /// as a raw string literal in the SwiftUI-side gesture code.
+    /// Every rendered joint sphere (see `skeletonEntity` below) is named `"joint.<rawValue>"` —
+    /// purely for entity identification/debugging (e.g. inspecting the scene graph). Edit Pose's
+    /// joint hit-testing (`ReconstructionSceneView.Coordinator.jointWithinRadius`) works off
+    /// `currentPositions`' world coordinates directly (screen-projected radius check) rather than
+    /// `ARView.entity(at:)` + this naming convention, since a fixed-visual-size entity hit test
+    /// can't express "hit zone bigger than what's actually drawn."
     private static let jointEntityNamePrefix = "joint."
 
     private static func jointEntityName(for joint: BodyJointName) -> String {
         jointEntityNamePrefix + joint.rawValue
-    }
-
-    /// Parses an `Entity.name` produced by `jointEntityName(for:)` back into a `BodyJointName` —
-    /// nil for any entity that isn't a joint sphere (the wall, bones, etc. all have different
-    /// names).
-    static func jointName(fromEntityName entityName: String) -> BodyJointName? {
-        guard entityName.hasPrefix(jointEntityNamePrefix) else { return nil }
-        return BodyJointName(rawValue: String(entityName.dropFirst(jointEntityNamePrefix.count)))
     }
 
     // MARK: - Wall mesh

@@ -97,7 +97,12 @@ final class RecordingSession {
     /// within `mergeToleranceSeconds` of it — so scrubbing to a slightly different position on a
     /// later visit updates the existing markup instead of piling up near-duplicate entries.
     /// Saving an empty stroke list deletes the entry rather than keeping an empty placeholder.
-    func setVideoAnnotation(timestampSeconds: Double, strokes: [AnnotationStroke], mergeToleranceSeconds: Double = 0.3) {
+    ///
+    /// Default widened to 1.0s (from an earlier 0.3s) to match the ±1s "show the saved annotation
+    /// while scrubbing near it" window `PlaybackView`/`SessionReviewView` now load with — an edit
+    /// made anywhere inside that same ±1s window should update the ONE entry currently being
+    /// shown, not create a near-duplicate a few tenths of a second away.
+    func setVideoAnnotation(timestampSeconds: Double, strokes: [AnnotationStroke], mergeToleranceSeconds: Double = 1.0) {
         var all = videoAnnotations
         if let index = all.firstIndex(where: { abs($0.timestampSeconds - timestampSeconds) <= mergeToleranceSeconds }) {
             if strokes.isEmpty {
