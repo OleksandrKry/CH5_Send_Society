@@ -13,7 +13,7 @@ struct ReconstructionResult {
     let baseWorldPositions: [BodyJointName: SIMD3<Float>]
     let initialWorldPositions: [BodyJointName: SIMD3<Float>]?
     let initialJointOverrides: [BodyJointName: SIMD3<Float>]?
-    let initialAnnotationStrokes: [AnnotationStroke]
+    let initialAnnotationStrokes: [AnnotationStrokeModel]
     let poseSample: BodyPoseSample?
     let cameraTransform: simd_float4x4?
     let depthContext: BodyPose3DExtractor.DepthGroundingContext?
@@ -119,7 +119,7 @@ enum ReconstructionHostEngine {
         timestampSeconds: Double,
         baseWorldPositions: [BodyJointName: SIMD3<Float>],
         jointOverrides: [BodyJointName: SIMD3<Float>]?,
-        annotationStrokes: [AnnotationStroke]
+        annotationStrokes: [AnnotationStrokeModel]
     ) {
         guard let session, let sessionStore else { return }
         let entry = ReconstructionEntry(

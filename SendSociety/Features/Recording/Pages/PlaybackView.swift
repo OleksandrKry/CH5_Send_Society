@@ -85,7 +85,7 @@ struct PlaybackView: View {
                 .onAppear { videoModel.play() }
 
             if isDrawingModeOn {
-                AnnotationOverlay(state: drawingState)
+                AnnotationComponent(annotationState: drawingState)
                 if !videoModel.isPlaying {
                     VStack {
                         Spacer()
@@ -98,7 +98,7 @@ struct PlaybackView: View {
                 // once the video pauses — the coach shouldn't need to tap "Annotate" just to SEE
                 // markup that's already there. `isInteractive: false` makes this read-only so it
                 // doesn't block taps meant for Play, Generate, or a marker underneath.
-                AnnotationOverlay(state: drawingState, isInteractive: false)
+                AnnotationComponent(annotationState: drawingState, isInteractive: false)
             }
         }
     }
@@ -107,7 +107,7 @@ struct PlaybackView: View {
 
     private var controlsArea: some View {
         VStack(spacing: 12) {
-            savedMomentMarkerRow
+            videoMarkerList
             videoScrubber
             playbackButtonsRow
             if !videoModel.isPlaying {
@@ -176,14 +176,14 @@ struct PlaybackView: View {
     /// Row of tappable dots along the scrubber — one per saved moment (drawing and/or 3D pose).
     /// Cube icon/teal = has a 3D pose (orange tint if it was only estimated, not measured live).
     /// Pencil icon/orange = drawing only. Tapping a marker jumps straight to that moment.
-    private var savedMomentMarkerRow: some View {
-        let moments = engine.allSavedMoments()
+    private var videoMarkerList: some View {
+        let moments = engine.getVideoMarkerList()
         return Group {
             if !moments.isEmpty, videoModel.duration > 0 {
                 GeometryReader { geometry in
                     ZStack(alignment: .leading) {
                         ForEach(moments) { moment in
-                            savedMomentMarkerButton(for: moment, trackWidth: geometry.size.width)
+                            saveVideoMarkerButton(for: moment, trackWidth: geometry.size.width)
                         }
                     }
                 }
@@ -192,23 +192,23 @@ struct PlaybackView: View {
         }
     }
 
-    private func savedMomentMarkerButton(for moment: SavedMomentMarker, trackWidth: CGFloat) -> some View {
-        let positionFraction = min(max(moment.videoTimeInSeconds / videoModel.duration, 0), 1)
+    private func saveVideoMarkerButton(for videoMarkerModel: VideoMarkerModel, trackWidth: CGFloat) -> some View {
+        let positionFraction = min(max(videoMarkerModel.videoTimeInSeconds / videoModel.duration, 0), 1)
         return Button {
-            jumpToSavedMoment(moment)
+            goToVideoMarker(videoMarkerModel)
         } label: {
-            Image(systemName: moment.has3DPose ? "cube.fill" : "pencil.tip.crop.circle.fill")
+            Image(systemName: videoMarkerModel.has3DPose ? "cube.fill" : "pencil.tip.crop.circle.fill")
                 .font(.system(size: 15))
                 .foregroundStyle(.white)
                 .frame(width: 26, height: 26)
-                .background(markerColor(for: moment), in: Circle())
+                .background(markerColor(for: videoMarkerModel), in: Circle())
         }
         .offset(x: trackWidth * positionFraction - 13)
     }
 
-    private func markerColor(for moment: SavedMomentMarker) -> Color {
-        if moment.has3DPose {
-            return moment.is3DPoseApproximate ? .orange : .teal
+    private func markerColor(for videoMarkerModel: VideoMarkerModel) -> Color {
+        if videoMarkerModel.has3DPose {
+            return videoMarkerModel.is3DPoseApproximate ? .orange : .teal
         }
         return .orange
     }
@@ -229,12 +229,12 @@ struct PlaybackView: View {
     /// Call when the coach taps a marker on the scrubber. Seeks the video there, shows whatever
     /// drawing belongs to that exact moment, and — if this moment has a saved 3D pose — jumps
     /// straight into the 3D view for it via `onGenerate`.
-    private func jumpToSavedMoment(_ moment: SavedMomentMarker) {
-        videoModel.seek(to: moment.videoTimeInSeconds)
-        currentDrawingVideoTime = moment.videoTimeInSeconds
-        drawingState.load(strokes: engine.findDrawing(nearVideoTime: moment.videoTimeInSeconds))
-        if moment.has3DPose {
-            onGenerate(videoURL, frameStore, moment.videoTimeInSeconds)
+    private func goToVideoMarker(_ videoMarkerModel: VideoMarkerModel) {
+        videoModel.seek(to: videoMarkerModel.videoTimeInSeconds)
+        currentDrawingVideoTime = videoMarkerModel.videoTimeInSeconds
+        drawingState.load(strokes: engine.findDrawing(nearVideoTime: videoMarkerModel.videoTimeInSeconds))
+        if videoMarkerModel.has3DPose {
+            onGenerate(videoURL, frameStore, videoMarkerModel.videoTimeInSeconds)
         }
     }
 }

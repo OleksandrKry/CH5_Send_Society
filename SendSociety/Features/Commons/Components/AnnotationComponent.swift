@@ -1,31 +1,9 @@
 import SwiftUI
 
-/// Simple OnForm-style screen-space markup for the Step 4 3D view — pen, straight line, and angle
-/// (two connected segments sharing a vertex, with the angle between them shown as text, useful
-/// for calling out e.g. an elbow or hip bend directly on the rendered pose).
-///
-/// Deliberately 2D/screen-space, drawn ON TOP of the 3D view rather than attached to the 3D scene
-/// — the same way OnForm and similar climbing/gymnastics video-analysis apps draw on a paused
-/// frame. That keeps this simple (no 3D raycasting/anchoring needed) and matches what "annotation"
-/// means in the reference app the coach is used to.
-///
-/// `AnnotationTool`/`AnnotationStroke` (the tool enum and the persisted stroke data) live in
-/// `Core/Models.swift`, not here — see that file's doc comment for why: `AnnotationStroke` is
-/// saved as part of a `RecordingSession`, so the persistence layer needs it without importing this
-/// UI file. Everything actually UI-shaped (the drawing surface, the toolbar, and the shared
-/// `ObservableObject` state) stays in this file.
-
-/// Shared between `AnnotationOverlay` (the drawing surface) and `AnnotationToolbar` (tool
-/// picker/clear/undo) — both need to read and mutate the same strokes/tool selection, so
-/// `ReconstructionView` owns one instance and hands it to both.
 final class AnnotationState: ObservableObject {
-    @Published var strokes: [AnnotationStroke] = []
+    @Published var strokes: [AnnotationStrokeModel] = []
     @Published var tool: AnnotationTool = .pen
 
-    /// The angle tool is a 2-step gesture (draw the first segment, then a second segment from the
-    /// same vertex) — these hold the first segment while waiting for the second. Reset whenever
-    /// the tool is switched, so a half-finished angle from before a tool change can't silently
-    /// complete with a stale vertex.
     fileprivate var pendingAngleVertex: CGPoint?
     fileprivate var pendingAngleFirstEnd: CGPoint?
 
@@ -46,19 +24,15 @@ final class AnnotationState: ObservableObject {
         pendingAngleFirstEnd = nil
     }
 
-    /// Swaps in a different set of strokes wholesale — used when video playback moves to a
-    /// different timestamp bucket and that moment has its own saved annotations (or none). Not
-    /// the same as `clear()`: this REPLACES the strokes with someone else's (possibly non-empty)
-    /// set, rather than emptying the current one.
-    func load(strokes: [AnnotationStroke]) {
+    func load(strokes: [AnnotationStrokeModel]) {
         self.strokes = strokes
         pendingAngleVertex = nil
         pendingAngleFirstEnd = nil
     }
 }
 
-struct AnnotationOverlay: View {
-    @ObservedObject var state: AnnotationState
+struct AnnotationComponent: View {
+    @ObservedObject var annotationState: AnnotationState
     /// True (the default) draws the strokes AND captures drag touches to draw new ones — this is
     /// the original, only behavior this view used to have, still what both `ReconstructionView`
     /// call sites want for their interactive Annotate mode.
@@ -89,69 +63,74 @@ struct AnnotationOverlay: View {
 
     private var canvasContent: some View {
         Canvas { context, _ in
-            for stroke in state.strokes {
+            for stroke in annotationState.strokes {
                 draw(stroke: stroke, in: &context)
             }
             if !liveStroke.isEmpty {
-                draw(stroke: AnnotationStroke(tool: state.tool, points: liveStroke), in: &context, isPreview: true)
+                draw(stroke: AnnotationStrokeModel(tool: annotationState.tool, points: liveStroke), in: &context, isPreview: true)
             }
             // The angle tool's first segment stays visible (solid, not preview-faded) while
             // waiting for the second drag, so it's clear the tool is mid-gesture rather than done.
-            if let vertex = state.pendingAngleVertex, let firstEnd = state.pendingAngleFirstEnd {
+            if let vertex = annotationState.pendingAngleVertex, let firstEnd = annotationState.pendingAngleFirstEnd {
                 var path = Path()
                 path.move(to: firstEnd)
                 path.addLine(to: vertex)
                 context.stroke(path, with: .color(.yellow), style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 if let liveAngleEnd {
-                    draw(stroke: AnnotationStroke(tool: .angle, points: [vertex, firstEnd, liveAngleEnd]), in: &context, isPreview: true)
+                    draw(stroke: AnnotationStrokeModel(tool: .angle, points: [vertex, firstEnd, liveAngleEnd]), in: &context, isPreview: true)
                 }
             }
         }
     }
 
     private func handleChanged(_ value: DragGesture.Value) {
-        switch state.tool {
+        switch annotationState.tool {
         case .pen:
             liveStroke.append(value.location)
-        case .line:
+        case .line, .arrow, .circle:
             liveStroke = [value.startLocation, value.location]
         case .angle:
-            if state.pendingAngleVertex != nil {
+            if annotationState.pendingAngleVertex != nil {
                 liveAngleEnd = value.location
             } else {
                 liveStroke = [value.startLocation, value.location]
             }
+        case .text:
+            break
         }
+        
     }
 
     private func handleEnded(_ value: DragGesture.Value) {
-        switch state.tool {
+        switch annotationState.tool {
         case .pen:
             if liveStroke.count > 1 {
-                state.strokes.append(AnnotationStroke(tool: .pen, points: liveStroke))
+                annotationState.strokes.append(AnnotationStrokeModel(tool: .pen, points: liveStroke))
             }
             liveStroke = []
-        case .line:
-            state.strokes.append(AnnotationStroke(tool: .line, points: [value.startLocation, value.location]))
+        case .line, .arrow, .circle:
+            annotationState.strokes.append(AnnotationStrokeModel(tool: annotationState.tool, points: [value.startLocation, value.location]))
             liveStroke = []
         case .angle:
-            if let vertex = state.pendingAngleVertex, let firstEnd = state.pendingAngleFirstEnd {
+            if let vertex = annotationState.pendingAngleVertex, let firstEnd = annotationState.pendingAngleFirstEnd {
                 // Second segment — the vertex is whatever the FIRST drag started at, not
                 // wherever this second drag happens to start, so the coach doesn't need
                 // pixel-perfect precision to "reconnect" at the shared point.
-                state.strokes.append(AnnotationStroke(tool: .angle, points: [vertex, firstEnd, value.location]))
-                state.pendingAngleVertex = nil
-                state.pendingAngleFirstEnd = nil
+                annotationState.strokes.append(AnnotationStrokeModel(tool: .angle, points: [vertex, firstEnd, value.location]))
+                annotationState.pendingAngleVertex = nil
+                annotationState.pendingAngleFirstEnd = nil
                 liveAngleEnd = nil
             } else {
-                state.pendingAngleVertex = value.startLocation
-                state.pendingAngleFirstEnd = value.location
+                annotationState.pendingAngleVertex = value.startLocation
+                annotationState.pendingAngleFirstEnd = value.location
                 liveStroke = []
             }
+        case .text:
+            break
         }
     }
 
-    private func draw(stroke: AnnotationStroke, in context: inout GraphicsContext, isPreview: Bool = false) {
+    private func draw(stroke: AnnotationStrokeModel, in context: inout GraphicsContext, isPreview: Bool = false) {
         let color: Color = isPreview ? Color.yellow.opacity(0.7) : .yellow
         switch stroke.tool {
         case .pen:
@@ -182,6 +161,34 @@ struct AnnotationOverlay: View {
                 let label = String(format: "%.0f°", degrees)
                 context.draw(Text(label).font(.headline.bold()).foregroundColor(.yellow), at: CGPoint(x: vertex.x + 14, y: vertex.y - 14))
             }
+        case .circle:
+            guard stroke.points.count >= 2 else { return }
+            let center = stroke.points[0]
+            let edge = stroke.points[1]
+            let radius = hypot(edge.x - center.x, edge.y - center.y)
+            let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
+            context.stroke(Path(ellipseIn: rect), with: .color(color), style: StrokeStyle(lineWidth: 3))
+        case .arrow:
+            guard stroke.points.count >= 2 else { return }
+            let start = stroke.points[0]
+            let end = stroke.points[1]
+            var path = Path()
+            path.move(to: start)
+            path.addLine(to: end)
+            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+
+            let angle = atan2(end.y - start.y, end.x - start.x)
+            let arrowLength: CGFloat = 14
+            let arrowAngle: CGFloat = .pi / 7
+            let left = CGPoint(x: end.x - arrowLength * cos(angle - arrowAngle), y: end.y - arrowLength * sin(angle - arrowAngle))
+            let right = CGPoint(x: end.x - arrowLength * cos(angle + arrowAngle), y: end.y - arrowLength * sin(angle + arrowAngle))
+            var head = Path()
+            head.move(to: left)
+            head.addLine(to: end)
+            head.addLine(to: right)
+            context.stroke(head, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+        case .text:
+            break
         }
     }
 

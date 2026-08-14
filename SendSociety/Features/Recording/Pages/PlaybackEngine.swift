@@ -1,24 +1,5 @@
 import Foundation
 
-/// One clickable dot on the video scrubber. It stands for a moment in the video that has
-/// something saved on it — a drawing, a 3D pose, or both at once (see
-/// `PlaybackEngine.markerMergeWindowSeconds` for how "both at once" is decided).
-///
-/// This is a plain data struct with NO SwiftUI in it — a designer's new marker UI just needs
-/// to read these fields and decide how to draw/color/animate them.
-struct SavedMomentMarker: Identifiable {
-    let id: UUID
-    /// Where this moment sits in the video, in seconds from the start.
-    let videoTimeInSeconds: Double
-    /// True if there's a saved drawing (pen/line/angle markup) at this moment.
-    let hasDrawing: Bool
-    /// True if there's a saved 3D pose reconstruction at this moment.
-    let has3DPose: Bool
-    /// True if the 3D pose was ESTIMATED after the fact (no real depth data), rather than
-    /// measured live with LiDAR during recording. Only meaningful when `has3DPose` is true.
-    let is3DPoseApproximate: Bool
-}
-
 /// PlaybackEngine is the "brain" behind the video review screen. It does NOT import SwiftUI and
 /// does NOT know about colors, fonts, buttons, or layout — it only answers two questions a video
 /// review screen needs answered:
@@ -65,7 +46,7 @@ final class PlaybackEngine {
     /// Returns the saved drawing closest to `videoTimeInSeconds`, if one exists within
     /// `annotationMatchWindowSeconds`. Returns an empty array (never nil) when nothing is saved
     /// nearby — an empty array just means "draw nothing right now."
-    func findDrawing(nearVideoTime videoTimeInSeconds: Double) -> [AnnotationStroke] {
+    func findDrawing(nearVideoTime videoTimeInSeconds: Double) -> [AnnotationStrokeModel] {
         guard let session else { return [] }
         let closestMatch = session.videoAnnotations.first {
             abs($0.timestampSeconds - videoTimeInSeconds) <= Self.annotationMatchWindowSeconds
@@ -76,7 +57,7 @@ final class PlaybackEngine {
     /// Saves `strokes` as the drawing for `videoTimeInSeconds` — replacing whatever was saved
     /// nearby before. Passing an empty array deletes the drawing instead of saving an empty one.
     /// Does nothing if there's no session/store to save into yet.
-    func saveDrawing(_ strokes: [AnnotationStroke], atVideoTime videoTimeInSeconds: Double) {
+    func saveDrawing(_ strokes: [AnnotationStrokeModel], atVideoTime videoTimeInSeconds: Double) {
         guard let session, let sessionStore else { return }
         session.setVideoAnnotation(timestampSeconds: videoTimeInSeconds, strokes: strokes)
         sessionStore.save()
@@ -86,11 +67,11 @@ final class PlaybackEngine {
     /// 3D pose. A drawing within `markerMergeWindowSeconds` of a 3D pose is folded into that
     /// pose's marker (one dot, not two); everything else becomes its own marker. The result is
     /// sorted earliest-to-latest, purely so marker order on screen is stable.
-    func allSavedMoments() -> [SavedMomentMarker] {
+    func getVideoMarkerList() -> [VideoMarkerModel] {
         guard let session else { return [] }
 
-        var moments: [SavedMomentMarker] = session.reconstructions.map { pose in
-            SavedMomentMarker(
+        var moments: [VideoMarkerModel] = session.reconstructions.map { pose in
+            VideoMarkerModel(
                 id: pose.id,
                 videoTimeInSeconds: pose.timestampSeconds,
                 hasDrawing: false,
@@ -102,7 +83,7 @@ final class PlaybackEngine {
         for drawing in session.videoAnnotations {
             if let matchIndex = moments.firstIndex(where: { abs($0.videoTimeInSeconds - drawing.timestampSeconds) <= Self.markerMergeWindowSeconds }) {
                 let existingMarker = moments[matchIndex]
-                moments[matchIndex] = SavedMomentMarker(
+                moments[matchIndex] = VideoMarkerModel(
                     id: existingMarker.id,
                     videoTimeInSeconds: existingMarker.videoTimeInSeconds,
                     hasDrawing: true,
@@ -110,7 +91,7 @@ final class PlaybackEngine {
                     is3DPoseApproximate: existingMarker.is3DPoseApproximate
                 )
             } else {
-                moments.append(SavedMomentMarker(
+                moments.append(VideoMarkerModel(
                     id: drawing.id,
                     videoTimeInSeconds: drawing.timestampSeconds,
                     hasDrawing: true,

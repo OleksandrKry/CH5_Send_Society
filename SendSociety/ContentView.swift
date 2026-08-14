@@ -171,7 +171,7 @@ private struct ReconstructionHost: View {
     /// onChange callbacks, and written into the saved `ReconstructionEntry` on every change (see
     /// `saveCurrentReconstruction()`).
     @State private var currentJointOverrides: [BodyJointName: SIMD3<Float>]?
-    @State private var currentAnnotationStrokes: [AnnotationStroke] = []
+    @State private var currentAnnotationStrokes: [AnnotationStrokeModel] = []
 
     var body: some View {
         Group {

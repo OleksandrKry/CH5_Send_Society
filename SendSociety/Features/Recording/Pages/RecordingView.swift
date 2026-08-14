@@ -53,7 +53,7 @@ struct RecordingView: View {
     var body: some View {
         ZStack(alignment: .top) {
             if let recordedURL {
-                PlaybackView(url: recordedURL, frameStore: recorder.frameStore, session: session, sessionStore: sessionStore, onGenerate: onGenerate)
+                PlaybackViewV2(url: recordedURL, frameStore: recorder.frameStore, session: session, sessionStore: sessionStore, onGenerate: onGenerate)
             } else {
                 ARMeshSceneView(session: arManager.session, showMesh: showMesh)
                     .ignoresSafeArea()

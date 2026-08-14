@@ -102,7 +102,7 @@ final class RecordingSession {
     /// while scrubbing near it" window `PlaybackView`/`SessionReviewView` now load with — an edit
     /// made anywhere inside that same ±1s window should update the ONE entry currently being
     /// shown, not create a near-duplicate a few tenths of a second away.
-    func setVideoAnnotation(timestampSeconds: Double, strokes: [AnnotationStroke], mergeToleranceSeconds: Double = 1.0) {
+    func setVideoAnnotation(timestampSeconds: Double, strokes: [AnnotationStrokeModel], mergeToleranceSeconds: Double = 1.0) {
         var all = videoAnnotations
         if let index = all.firstIndex(where: { abs($0.timestampSeconds - timestampSeconds) <= mergeToleranceSeconds }) {
             if strokes.isEmpty {
@@ -143,7 +143,7 @@ final class RecordingSession {
 struct VideoAnnotationEntry: Codable, Identifiable {
     var id: UUID = UUID()
     var timestampSeconds: Double
-    var strokes: [AnnotationStroke]
+    var strokes: [AnnotationStrokeModel]
 }
 
 /// One generated (and possibly since hand-corrected/annotated) 3D reconstruction at a specific
@@ -177,7 +177,7 @@ struct ReconstructionEntry: Identifiable {
     var jointOverrides: [BodyJointName: SIMD3<Float>]?
     /// This reconstruction's own 3D-view annotations (see `ReconstructionView`'s Annotate mode) —
     /// separate from `VideoAnnotationEntry`'s 2D video-playback markup.
-    var annotationStrokes: [AnnotationStroke] = []
+    var annotationStrokes: [AnnotationStrokeModel] = []
     /// True for a reconstruction generated later, from `SessionReviewView`, instead of live during
     /// the original recording — see this type's doc comment. Defaults to `false` so older saved
     /// entries (from before this field existed) decode as "live-quality" — which is what they are.
@@ -199,7 +199,7 @@ extension ReconstructionEntry: Codable {
         timestampSeconds = try container.decode(Double.self, forKey: .timestampSeconds)
         worldPositions = try container.decode([BodyJointName: SIMD3<Float>].self, forKey: .worldPositions)
         jointOverrides = try container.decodeIfPresent([BodyJointName: SIMD3<Float>].self, forKey: .jointOverrides)
-        annotationStrokes = try container.decodeIfPresent([AnnotationStroke].self, forKey: .annotationStrokes) ?? []
+        annotationStrokes = try container.decodeIfPresent([AnnotationStrokeModel].self, forKey: .annotationStrokes) ?? []
         isApproximate = try container.decodeIfPresent(Bool.self, forKey: .isApproximate) ?? false
     }
 

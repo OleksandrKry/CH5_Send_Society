@@ -1,160 +1,219 @@
-# Send Society — Project Structure Guide
+# Send Society — Project Structure Reference
 
-This doc explains how the codebase is organized and how a climb flows through it, so a new
-frontend or backend developer can find their way around without reading every file first.
+This is a navigation map of the app, built by reading every file's doc comments and declarations.
+Use it to find "where does X live" without re-browsing the whole project. When rebuilding from
+zero, work through the **Suggested Build Order** at the bottom, block by block.
 
-## What the app does
+---
 
-Send Society is a LiDAR climbing-coach app for iPad/iPhone. A coach scans a climbing wall,
-optionally calibrates a climber's body measurements, records a climb on video, and then generates
-a static 3D reconstruction of the climber's pose against the scanned wall — useful for reviewing
-grip and foot placement after the fact. Everything is saved locally so a session can be reopened
-and re-analyzed later.
+## 1. What the app does
 
-## The two top-level folders
+A LiDAR climbing-coach app for iPad. A coach scans a climbing wall, records the climber's attempt
+on video (with live depth data), then generates a static 3D skeleton pose placed against the
+scanned wall — so the climber's body position can be reviewed and annotated after the fact.
+Sessions are saved and can be reopened later from a library list.
+
+Pipeline: **scan the wall → record the climb → pick a moment → generate a 3D pose → annotate/save**.
+
+## 2. Big-picture architecture
+
+Three top-level folders:
+
+- **`Core/`** — plain Swift only. No SwiftUI anywhere in this folder. Split into four modules:
+  `Capture` (getting real-world data in), `PoseReconstruction` (the actual climbing-analysis
+  algorithm), `Persistence` (saving/loading to disk), plus a few root-level small utilities
+  (`Models.swift`, `DebugLog.swift`, `DeveloperSettings.swift`, `LiDARSupport.swift`,
+  `UserIdentity.swift`).
+- **`Features/`** — SwiftUI screens, one subfolder per screen area: `Onboarding`, `Recording`,
+  `Library`, `Reconstruction`, plus `Shared` for small pieces reused across screens.
+- **Root** — `ContentView.swift` (the record→reconstruct pipeline coordinator) and
+  `SendSocietyApp.swift` (the `@main` entry point).
+
+**The Engine/View split** (applies to every screen under `Features/*/Pages/`): each screen is a
+PAIR of files — `SomethingEngine.swift` (a plain class/struct/enum, `import Foundation` only, no
+SwiftUI — holds all the actual logic/decisions) and `SomethingView.swift` (SwiftUI, UI-only,
+calls into the Engine for every decision instead of embedding logic itself). This means a
+front-end redesign only ever needs to touch the View file; the Engine file underneath never
+changes. `RecordingEngine`/`RecordingView`, `PlaybackEngine`/`PlaybackView`,
+`LibraryEngine`/`LibraryView`, `SessionReviewEngine`/`SessionReviewView`,
+`ReconstructionHostEngine` (paired with `ContentView`'s private `ReconstructionHost`) all follow
+this pattern.
+
+**`@MainActor` rule:** `SessionStore` (in `Core/Persistence`) is the only `@MainActor`-isolated
+type in the whole app (SwiftData's `ModelContext` isn't safe off the main thread). Any Engine
+type that calls a `SessionStore` method (`.save()`, `.fetchAll()`, `.delete()`) must itself be
+marked `@MainActor`. SwiftUI `View` structs get this for free (protocol-conformance global-actor
+inference), so plain Views calling `sessionStore.save()` inline never need the annotation — only
+plain Engine classes/structs/enums do.
+
+## 3. App entry & navigation flow
 
 ```
-SendSociety/
-├── Core/          the app's actual algorithms — no SwiftUI, no navigation
-└── Features/      the screens — SwiftUI only, calls into Core
+SendSocietyApp (@main)
+  └─ LibraryView                              ← actual app root, shown first
+       ├─ "New Recording" → ContentView         (full-screen pipeline)
+       │    ├─ step = .recording → RecordingView → (stop) → PlaybackView
+       │    │                                              (same screen, shows recorded clip)
+       │    │        PlaybackView "Generate 3D" → step = .reconstruction
+       │    └─ step = .reconstruction → ReconstructionHost (private, in ContentView.swift)
+       │         └─ ReconstructionView (+ ReconstructionSceneView for the RealityKit scene)
+       │              "Done" → onFinished() → back to LibraryView
+       └─ tap a saved session row → SessionReviewView
+            ├─ scrubber marker w/ saved 3D pose → SavedReconstructionReviewView
+            └─ "Estimate 3D View" (no live AR) → SessionReviewEngine.generateEstimate(...)
 ```
 
-**Core is "the core function."** It takes plain data in (camera frames, joint samples, transforms)
-and hands plain data or RealityKit entities back out. Nothing in `Core/` imports SwiftUI or knows
-about navigation. This is deliberate: a backend developer can change how pose detection or
-persistence works without touching a single screen, and a frontend developer can redesign a screen
-without needing to understand LiDAR grounding math.
+Onboarding screens (`InitialScreen`, `Tutorial1`/`Tutorial2`/`Tutorial3`, `TutorialOne`) exist as
+files but are **not wired into `SendSocietyApp`** — the app launches straight into `LibraryView`.
+Treat them as unused/future work unless you wire them in yourself.
 
-**Features is the UI.** Each subfolder is one screen (or a small group of related screens), split
-into `Pages/` (the actual screen, wired to navigation and state) and `Components/` (reusable
-rendering pieces that screen uses). `Features/Shared/Components/` holds pieces used by more than
-one screen.
+## 4. Full file map
 
-There are no separate Xcode targets or Swift Packages here — everything compiles into one app
-target. The Core/Features split and the module folders inside Core are a **convention**, not a
-compiler-enforced boundary. Please respect the "go through the entry point" rule in each module
-(explained below) even though nothing will stop you from reaching around it.
+### Core/ (plain Swift, no SwiftUI)
 
-## The user's path through the app
-
-```
-LibraryView (home screen)
-   │
-   │ "New Recording"
-   ▼
-ContentView (owns the 4-step pipeline + the one shared ARSession)
-   │
-   ├─ Step 1  WallScanView            scan the wall with LiDAR
-   ├─ Step 2  CalibrationView         capture climber's body measurements (skippable)
-   ├─ Step 3  RecordingView/PlaybackView   record the climb, scrub back, annotate
-   └─ Step 4  ReconstructionView      generate + view the 3D pose reconstruction
-   │
-   │ "Done"
-   ▼
-back to LibraryView
-```
-
-From `LibraryView`, tapping a saved session instead opens `SessionReviewView` — play back the
-video, revisit a saved 3D reconstruction, or run "Estimate 3D View" on a moment that was never
-reconstructed live (lower-accuracy, since the real LiDAR depth from the original recording no
-longer exists in memory by then).
-
-`ContentView` is the only place that owns the shared `ARSessionManager` and the pipeline's
-in-progress state (`currentSession`, the recorded video URL, etc.) — Steps 1-4 are just views it
-swaps between.
-
-## Core/ — the algorithms
-
-### Core/ (flat files)
-
-General-purpose types with no other home: `Models.swift` (shared value types like
-`AnnotationStroke`, `BodyJointName`), `DebugLog.swift` (logging categories), `LiDARSupport.swift`
-(device capability check), `UserIdentity.swift` (guest identity).
-
-### Core/Capture/ — recording
-
-Everything about running the AR session and getting a video + per-frame LiDAR data onto disk.
-
-| File | Purpose |
-|---|---|
-| `ARSessionManager.swift` | Owns the single shared `ARSession` used across Steps 1-3; wall mesh, tracking quality, depth confidence. |
-| `VideoRecorder.swift` | Encodes the camera feed to an MP4 via `AVAssetWriter`. |
-| `RecordedFrameStore.swift` | Stores each frame's camera transform + depth (NOT the color image — that's re-extracted from the saved video on demand, since holding every frame's image in memory is what caused an early OOM crash). |
-| `VideoFrameExtractor.swift` | Pulls a single color frame out of the saved video file at a given timestamp. |
-| `PixelBufferCopy.swift` | Low-level `CVPixelBuffer` copying helper. |
-| `DeviceDiagnostics.swift` | Memory/thermal logging during recording. |
-
-### Core/PoseReconstruction/ — the actual climbing analysis
-
-Vision body/hand detection, LiDAR grounding, grip/foot classification, manual pose-edit
-constraints, and turning all of that into renderable RealityKit geometry. The two main entry
-points most callers need are `BodyPose3DExtractor` (detection) and `ReconstructionEntityBuilder`
-(turning a detected pose into world-space positions / 3D geometry).
-
-| File | Purpose |
-|---|---|
-| `BodyPose3DExtractor.swift` | Runs Vision's body/hand pose requests and grounds joints in real LiDAR depth where available. |
-| `ReconstructionEntityBuilder.swift` | Builds the RealityKit wall + skeleton entities; computes world-space joint positions. |
-| `LiveReconstructionGenerator.swift` | The full pipeline behind Step 4's live "Generate" button (detection + grounding + grip/foot classification + nearby-frame fallback). |
-| `ReconstructionEstimator.swift` | The lower-fidelity pipeline behind Session Review's "Estimate 3D View" (no live LiDAR depth available at that point). |
-| `CalibrationEngine.swift` | Averages several frames of captured joint positions into one `CalibrationResult`. |
-| `CalibrationFrameProcessor.swift` | Per-frame detection + grounding logic for Step 2's 15Hz capture loop. |
-| `CalibrationHeightCorrection.swift` | Decides whether/how a climber's entered height should adjust the measured calibration. |
-| `GripClassifier.swift` | Heuristics that classify a hand/foot position into a named grip/placement type. |
-| `PresetPoseLibrary.swift` | Preset hand/foot pose geometry attached when a grip/placement is classified confidently. |
-| `SkeletonPoseEditor.swift` | Anatomical joint-range-of-motion constraints used when a coach manually drags a joint. |
-| `JointDragProjector.swift` | Pure ray/plane math for turning a 2D screen drag into a 3D joint position. |
-
-### Core/Persistence/ — saving and loading
-
-`SessionStore.swift` is **the front door** — it's the only type other code should call to
-create/save/load/delete a `RecordingSession`. `SessionFileStore.swift` (video file storage) and
-`WallScanArchive.swift` (saved wall mesh/texture data) are implementation details `SessionStore`
-uses internally; please don't call them directly from a screen. `RecordingSession.swift` is the
-SwiftData `@Model` itself, and `CodableSIMD.swift` bridges `simd` types (used throughout pose math)
-so they can be stored in SwiftData/JSON.
-
-> **SwiftData migration note:** every stored property on `RecordingSession` needs a literal
-> default value in its declaration, not just in an initializer. Adding a new required property
-> without one has silently broken loading existing saved sessions before — see the doc comment on
-> `recordingDeviceOrientationRawValue` for the full story.
-
-## Features/ — the screens
-
-| Folder | Screen | Notes |
+| File | Lines | What it's for |
 |---|---|---|
-| `WallScan/Pages/WallScanView.swift` | Step 1 | Live mesh view + scan-coverage heatmap. |
-| `Calibration/Pages/CalibrationView.swift` | Step 2 | Drives the 15Hz capture loop via `CalibrationFrameProcessor`; skippable. |
-| `Calibration/Components/TPoseSilhouette.swift` | — | The T-pose guide overlay shape. |
-| `Recording/Pages/RecordingView.swift` | Step 3 (record) | Wraps the record button + live mesh view. |
-| `Recording/Pages/PlaybackView.swift` | Step 3 (scrub) | Shown after recording stops — scrubber, 2D annotation, "Generate 3D View" button. |
-| `Reconstruction/Pages/ReconstructionView.swift` | Step 4 | Orbit-camera 3D view, Edit Pose / Annotate modes, grip/foot readout. |
-| `Reconstruction/Components/ReconstructionSceneView.swift` | — | The actual RealityKit `UIViewRepresentable` + gesture handling `ReconstructionView` renders into. |
-| `Library/Pages/LibraryView.swift` | Home | Chronological list of saved sessions. |
-| `Library/Pages/SessionReviewView.swift` | Session review | Reopen a saved session's video/annotations/reconstructions. |
-| `Library/Pages/SavedReconstructionReviewView.swift` | Session review | Renders one saved reconstruction with no live AR session needed. |
-| `Library/Components/SessionRow.swift` | — | One row in the Library list. |
-| `Shared/Components/ARMeshSceneView.swift` | — | Live camera + mesh-wireframe view, used by WallScan, Calibration, and Recording. |
-| `Shared/Components/AnnotationOverlay.swift` | — | 2D pen/line/angle markup surface, used by Recording and Reconstruction and Session Review. |
-| `Shared/Components/PlaybackModel.swift` | — | `AVPlayer` wrapper backing the video scrubber, used by Recording and Session Review. |
+| `Core/Models.swift` | 116 | Shared plain data types used everywhere: `AppStep` (recording/reconstruction), `TrackingQuality`, `BodyJointName` (the skeleton joint enum), `SkeletonBone`, `AnnotationTool`, `AnnotationStroke`. |
+| `Core/DebugLog.swift` | 18 | OSLog categories, one per MVP success criterion (recording / reconstruction / tracking / general), so device console logs can be filtered per-question. |
+| `Core/DeveloperSettings.swift` | 21 | Tiny UserDefaults-backed dev-only toggles (e.g. "show raw LiDAR mesh"), not a real settings screen. |
+| `Core/LiDARSupport.swift` | 10 | One check: does this device support scene reconstruction at all. |
+| `Core/UserIdentity.swift` | 39 | Local guest user ID (`UUID`), stamped on every saved session. No real login yet; designed so a future login can "claim" this same ID. |
+| `Core/Capture/ARSessionManager.swift` | 282 | Owns the single shared `ARSession` (one instance across the whole record pipeline — never restarted, or wall/body coordinate spaces drift apart). Publishes `trackingQuality`, `meshAnchors`, `latestFrame`, `wallTextureReference`. Also: `captureWallTextureReference()` (freezes a color+depth reference frame + mesh snapshot when wall scanning is marked done), `depthConfidenceRatio(for:)` (live per-frame "how much of this view has confident depth" 0...1), private `averageConfidentDepth(depthMap:confidenceMap:)` (pixel-math average depth in meters). |
+| `Core/Capture/VideoRecorder.swift` | 247 | Records ARKit camera frames to `.mp4` via `AVAssetWriter`; simultaneously feeds each frame to `RecordedFrameStore` keyed by ARKit timestamp, so a paused video position can be traced back to matching depth/camera data. |
+| `Core/Capture/RecordedFrameStore.swift` | 136 | In-memory store of per-frame camera transform + depth data captured during recording; `nearestFrame(toPlaybackSeconds:)` looks one up by paused video time. |
+| `Core/Capture/PixelBufferCopy.swift` | 44 | One helper: deep-copy a `CVPixelBuffer` (ARKit buffers are pool-reused and unsafe to hold onto raw). |
+| `Core/Capture/VideoFrameExtractor.swift` | 35 | Pulls a single still frame out of a saved `.mp4` at an arbitrary timestamp — used by session review's "Estimate 3D" path. |
+| `Core/Capture/DeviceDiagnostics.swift` | 45 | Lightweight memory/thermal readouts for diagnosing crashes during the heaviest workload (recording). |
+| `Core/Persistence/SessionStore.swift` | 125 | **The only front door to persistence.** Every screen creates/reads/updates/deletes a `RecordingSession` through this — never through `SessionFileStore`/`WallScanArchive` directly. `@MainActor`. Functions: `createSession(...)`, `fetchAll()`, `delete(_:)`, `save()`, `wallTextureReference(for:)`, `videoURL(for:)`. |
+| `Core/Persistence/RecordingSession.swift` | 215 | The one SwiftData `@Model` class. Child data (video annotations, 3D reconstructions) stored as JSON blobs on this single model rather than separate related models (deliberate — simpler, lower-risk without a compiler). Also defines `VideoAnnotationEntry` and `ReconstructionEntry`. |
+| `Core/Persistence/SessionFileStore.swift` | 73 | Implementation detail of `SessionStore` — resolves filenames/folder names stored on `RecordingSession` into actual file paths (Application Support directory, not Documents). |
+| `Core/Persistence/WallScanArchive.swift` | 327 | Implementation detail of `SessionStore` — saves/loads an `ARSessionManager.WallTextureReference` to/from disk (color image, depth grid, confidence grid, camera pose) so a wall scan survives after the live AR session ends. **Flagged as the highest-risk file in the codebase** (raw `CVPixelBuffer` packing/unpacking, unverified on device). |
+| `Core/Persistence/CodableSIMD.swift` | 84 | Retroactive `Codable` conformance for `SIMD3<Float>`, `SIMD4`, `simd_float3x3`, `simd_float4x4` — needed once, centrally, so every domain struct containing one of these can just add `: Codable`. |
+| `Core/PoseReconstruction/BodyPose3DExtractor.swift` | 909 | **The Vision detection core.** Runs `VNDetectHumanBodyPose3DRequest`, defines `BodyPoseSample` (raw Vision output) and `DepthGroundingContext`. Key functions: `detect(inVideoFrame:deviceOrientation:)`, `groundSkeletonRootAnchored(...)` (the LiDAR-grounded, high-accuracy path), `worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)` (Vision-only fallback path, lower accuracy), `projected2DImagePoints(...)` (for 2D skeleton preview overlays). |
+| `Core/PoseReconstruction/ReconstructionEntityBuilder.swift` | 731 | **The RealityKit geometry builder.** Turns wall mesh anchors + a `BodyPoseSample`/`worldPositions` into actual renderable `Entity` objects: `wallEntity(...)`, `pointCloudWallEntity(...)` (bump-detailed textured wall from raw depth), `skeletonEntity(...)` (both the thin red skeleton and the tan mannequin body, sharing one `cylinderBetween` helper), `worldJointPositions(...)`. |
+| `Core/PoseReconstruction/LiveReconstructionGenerator.swift` | 133 | Runs the full **live** Step-4 pipeline for one paused video moment: real recorded LiDAR depth + camera pose (from `RecordedFrameStore`) + Vision detection, all the way to grounded world positions. This is the higher-accuracy path (vs. `ReconstructionEstimator`). |
+| `Core/PoseReconstruction/ReconstructionEstimator.swift` | 105 | Builds a `ReconstructionEntry` from a saved video frame **without** live LiDAR depth — the "Estimate 3D" path used from session review, when the original recording never had depth data saved for that exact moment. Lower accuracy, entries flagged `isApproximate`. |
+| `Core/PoseReconstruction/SkeletonPoseEditor.swift` | 221 | Manual joint-drag math with anatomical constraints (cone/hinge angle clamps per joint, real clinical ROM figures) — keeps a coach's manual joint correction anatomically plausible. Pure math, no RealityKit dependency. |
+| `Core/PoseReconstruction/JointDragProjector.swift` | 30 | Pure "unproject a 2D screen touch into a 3D drag" math, pulled out of `ReconstructionSceneView`'s gesture coordinator. |
+| `Core/PoseReconstruction/PersonPresenceDetector.swift` | 53 | Lightweight "is anyone in this shot" check (`VNDetectHumanRectanglesRequest`, not the heavy 3D pose request) — used to skip auto-saving a wall reference frame that has a person standing in it. |
 
-`ContentView.swift` and `SendSocietyApp.swift` at the top level are the app entry point and the
-Steps 1-4 pipeline coordinator — they're not really part of any one feature.
+### Features/ (SwiftUI)
 
-## Where to add new code
+| File | Lines | What it's for |
+|---|---|---|
+| `Features/Recording/Pages/RecordingEngine.swift` | 107 | Engine for Step 2. Owns two repeating timers: depth-quality polling (`depthQuality`, `isReadyToRecord`) and periodic person-gated wall-mesh auto-save (`wallSaveLogLines`, `attemptWallMeshSave()`). |
+| `Features/Recording/Pages/RecordingView.swift` | 183 | View for Step 2. "Point at the Wall" screen — live AR mesh view, readiness guidance text, record button. Hands off to `PlaybackView` once a clip exists. |
+| `Features/Recording/Pages/PlaybackEngine.swift` | 125 | Engine for the video-review screen. Defines `VideoMarkerModel`. Functions: `findDrawing(nearVideoTime:)`, `saveDrawing(_:atVideoTime:)`, `allSavedMoments()` (merges saved drawings + saved 3D poses into one scrubber marker list). |
+| `Features/Recording/Pages/PlaybackView.swift` | 259 | View for the video-review screen shown right after recording stops. Scrubber with tappable markers, drawing overlay, "Generate 3D" button. |
+| `Features/Library/Pages/LibraryEngine.swift` | 31 | Engine for the library list. Three functions wrapping `SessionStore`: `loadAllSessions()`, `sessions(_:matching:)` (search filter), `deleteSession(_:)`. |
+| `Features/Library/Pages/LibraryView.swift` | 184 | **App's actual root screen.** Chronological session list + "New Recording" entry point into `ContentView`. |
+| `Features/Library/Components/SessionRow.swift` | 54 | One row in the library list: title, relative date, duration, reconstruction-count badge. |
+| `Features/Library/Pages/SessionReviewEngine.swift` | 156 | Engine for reopening a saved session. Defines `SkeletonPreviewResult`, `SkeletonPreviewFailure` (Error wrapper). Functions: `reconstruction(nearVideoTime:)`, `deleteReconstruction(_:)`, `generateEstimate(...)` (real save), `generateSkeletonPreview(...)` (disposable sanity-check overlay, nothing saved). `@MainActor`. |
+| `Features/Library/Pages/SessionReviewView.swift` | 485 | View for reopening a saved session — video playback with saved drawings, scrubber markers, "Estimate 3D View", "Preview Skeleton" toggle. |
+| `Features/Library/Pages/SavedReconstructionReviewView.swift` | 89 | Renders one already-saved `ReconstructionEntry` directly (no Vision, no live AR session) — reuses `ReconstructionView`'s "load existing pose" path. |
+| `Features/Reconstruction/Pages/ReconstructionHostEngine.swift` | 134 | Engine for Step 4's first-frame decision. Defines `ReconstructionResult`. Functions: `loadOrGenerate(input:session:wallReference:)` (load a nearby saved pose, or run `LiveReconstructionGenerator` fresh), `save(...)`. `@MainActor`. |
+| `Features/Reconstruction/Pages/ReconstructionView.swift` | 323 | View for Step 4 — the non-AR RealityKit scene (wall + skeleton), mode controls (view/edit-pose/annotate), reset pose, banners. |
+| `Features/Reconstruction/Components/ReconstructionSceneView.swift` | 603 | The actual RealityKit rendering + gesture surface (`UIViewRepresentable`) behind `ReconstructionView` — orbit camera, pinch-zoom, joint-drag hit-testing via its `Coordinator`. **Deliberately left untouched during the app-wide simplification pass** — large, recently-tested gesture state machine. |
+| `Features/Onboarding/InitialScreen.swift`, `Tutorial1.swift`, `Tutorial2.swift`, `Tutorial3.swift`, `TutorialOne.swift` | ~40-50 each | Onboarding screens. **Not wired into the app** (`SendSocietyApp` launches straight into `LibraryView`). Known bugs left as-is: `Tutorial2`/`Tutorial3` both reference image `"Tutorial1"`; `Tutorial3`'s button has an empty action. |
+| `Features/Shared/Components/PlaybackModel.swift` | 55 | Thin `AVPlayer` wrapper (`@Published` play/pause/current time) shared between `PlaybackView` and `SessionReviewView`. |
+| `Features/Shared/Components/AnnotationOverlay.swift` | 241 | Screen-space drawing surface (pen/line/angle tools) drawn on top of the 3D view. Defines `AnnotationState` (shared `ObservableObject`) and `AnnotationToolbar`. |
+| `Features/Shared/Components/ARMeshSceneView.swift` | 42 | Thin `UIViewRepresentable` wrapper around a live-passthrough RealityKit `ARView`, attached to the shared `ARSessionManager` session — used by `RecordingView`. |
+| `Features/Shared/Components/MeshToggleButton.swift` | 29 | Small button toggling the live LiDAR mesh wireframe on/off, backed by `DeveloperSettings.showMesh`. |
+| `Features/Shared/Components/SkeletonImageOverlayView.swift` | 127 | Draws Vision's raw 2D detected skeleton on top of a single still frame — the "Preview Skeleton" sanity check before running a full 3D generate/estimate. |
 
-- **A new screen or a change to an existing screen's layout** → `Features/<Feature>/Pages/`.
-- **A reusable piece of UI used by only one screen** → that screen's own `Components/` folder.
-- **A reusable piece of UI used by more than one screen** → `Features/Shared/Components/`.
-- **A change to how pose detection, grounding, or classification works** → `Core/PoseReconstruction/`.
-- **A change to what gets saved or how** → go through `SessionStore` in `Core/Persistence/`; don't
-  add new direct callers of `SessionFileStore`/`WallScanArchive`.
-- **A change to recording/capture itself** → `Core/Capture/`.
+### Root
 
-## A note on testing
+| File | Lines | What it's for |
+|---|---|---|
+| `SendSocietyApp.swift` | 26 | `@main` entry point. Registers the SwiftData model container for `RecordingSession.self`. Shows `LibraryView` as the root. |
+| `ContentView.swift` | 238 | Root of the record→reconstruct pipeline (reached from `LibraryView`'s "New Recording"). Owns the single shared `ARSessionManager` + `VideoRecorder` for the pipeline's lifetime, switches between `.recording`/`.reconstruction` via `AppStep`, creates the `RecordingSession` the moment recording finishes (`createSessionIfNeeded`). Also defines `ReconstructionInput` (Step 3→4 handoff data) and the private `ReconstructionHost` view (wraps `ReconstructionHostEngine`). |
 
-This project is developed and tested entirely on real LiDAR-equipped hardware — there's no
-simulator support for LiDAR/ARKit, and changes are verified by rebuilding and running through the
-4-step flow on-device rather than with unit tests or a local build. Keep that in mind when making a
-change: prefer small, easy-to-verify edits, and check the doc comments near anything you're
-touching — many of them record a real on-device bug that motivated the current approach.
+## 5. Persistence flow, in one paragraph
+
+Every screen talks to `SessionStore` only (never `SessionFileStore`/`WallScanArchive` directly —
+those are private implementation details by convention, not by compiler enforcement, since this
+is a single app target). `SessionStore` reads/writes the one SwiftData `@Model`,
+`RecordingSession`, whose big binary data (video file, archived wall scan) lives on disk as
+separate files referenced by filename/folder name — not stored as SwiftData blobs themselves.
+Per-timestamp video annotations and 3D reconstructions are stored as JSON `Data` blobs directly on
+`RecordingSession` (not as separate related `@Model` types) to avoid depending on SwiftData
+relationship macros that couldn't be verified without a compiler.
+
+## 6. Xcode project registration (manual file-by-file build only)
+
+Every new `.swift` file needs 4 correlated entries added to `SendSociety.xcodeproj/project.pbxproj`:
+a `PBXBuildFile` entry, a `PBXFileReference` entry, an entry in the right group's `children` array,
+and an entry in the `PBXSourcesBuildPhase` `files` array — each new file needs a fresh 24-character
+uppercase hex ID (e.g. via `python3 -c "import secrets; print(secrets.token_hex(12).upper())"`).
+If you're adding files through Xcode itself (dragging a new file into the navigator), Xcode does
+this automatically — this only matters if a file is created outside Xcode and needs registering by
+hand.
+
+## 7. Suggested build order, block by block
+
+Build in this order so each block only depends on blocks already built. Test/compile after every
+block before moving to the next.
+
+**Block 1 — Foundation (no UI, nothing depends on anything else yet)**
+`Core/Models.swift`, `Core/DebugLog.swift`, `Core/DeveloperSettings.swift`, `Core/LiDARSupport.swift`,
+`Core/UserIdentity.swift`, `Core/Persistence/CodableSIMD.swift`.
+
+**Block 2 — Persistence**
+`Core/Persistence/RecordingSession.swift` → `Core/Persistence/SessionFileStore.swift` →
+`Core/Persistence/WallScanArchive.swift` → `Core/Persistence/SessionStore.swift`.
+(`SessionStore` depends on all three of the others.)
+
+**Block 3 — Capture (getting AR/video data)**
+`Core/Capture/PixelBufferCopy.swift`, `Core/Capture/DeviceDiagnostics.swift` → 
+`Core/Capture/ARSessionManager.swift` (needs `WallScanArchive`'s type shape for `WallTextureReference`,
+though not a direct import) → `Core/Capture/RecordedFrameStore.swift` →
+`Core/Capture/VideoRecorder.swift` → `Core/Capture/VideoFrameExtractor.swift`.
+
+**Block 4 — Minimal end-to-end skeleton (get something on screen)**
+`SendSocietyApp.swift` → a trivial placeholder `ContentView.swift`/`LibraryView.swift` just to
+confirm the SwiftData container + navigation shell boots.
+
+**Block 5 — Recording screen**
+`Features/Recording/Pages/RecordingEngine.swift` → `Features/Shared/Components/ARMeshSceneView.swift` →
+`Features/Shared/Components/MeshToggleButton.swift` → `Features/Recording/Pages/RecordingView.swift`.
+Needs Block 3 (ARSessionManager, VideoRecorder) + Block 1 (DeveloperSettings).
+
+**Block 6 — Playback screen**
+`Features/Shared/Components/PlaybackModel.swift` → `Features/Shared/Components/AnnotationOverlay.swift` →
+`Features/Recording/Pages/PlaybackEngine.swift` → `Features/Recording/Pages/PlaybackView.swift`.
+Needs Block 2 (SessionStore/RecordingSession) + Block 1 (AnnotationStroke).
+
+**Block 7 — Pose reconstruction algorithm (still no UI)**
+`Core/PoseReconstruction/PersonPresenceDetector.swift` → `Core/PoseReconstruction/BodyPose3DExtractor.swift`
+(the big one — build/test in isolated pieces if possible: `detect`, then `groundSkeletonRootAnchored`,
+then the fallback `worldPosition`) → `Core/PoseReconstruction/JointDragProjector.swift` →
+`Core/PoseReconstruction/SkeletonPoseEditor.swift` → `Core/PoseReconstruction/ReconstructionEntityBuilder.swift` →
+`Core/PoseReconstruction/LiveReconstructionGenerator.swift` → `Core/PoseReconstruction/ReconstructionEstimator.swift`.
+
+**Block 8 — Reconstruction screen**
+`Features/Reconstruction/Pages/ReconstructionHostEngine.swift` →
+`Features/Reconstruction/Components/ReconstructionSceneView.swift` →
+`Features/Reconstruction/Pages/ReconstructionView.swift`.
+Needs Block 7 in full.
+
+**Block 9 — Wire the pipeline together**
+`ContentView.swift` for real (replacing the Block 4 placeholder) — owns `ARSessionManager`/
+`VideoRecorder`, switches `RecordingView` ↔ `ReconstructionHost`/`ReconstructionView`, creates the
+`RecordingSession` on recording-stop.
+
+**Block 10 — Library / session review**
+`Features/Library/Components/SessionRow.swift` → `Features/Library/Pages/LibraryEngine.swift` →
+`Features/Library/Pages/LibraryView.swift` (now the real app root — update `SendSocietyApp.swift`) →
+`Features/Shared/Components/SkeletonImageOverlayView.swift` →
+`Features/Library/Pages/SessionReviewEngine.swift` → `Features/Library/Pages/SessionReviewView.swift` →
+`Features/Library/Pages/SavedReconstructionReviewView.swift`.
+
+**Block 11 — Onboarding (optional / currently unused)**
+`Features/Onboarding/*.swift` — build last, wire into `SendSocietyApp` only if/when you actually
+want an onboarding flow; the rest of the app doesn't depend on it.
+
+---
+
+*When asking "how do I build X," name the screen/file and I'll pull the exact section above plus
+read the current file(s) fresh — this doc is a map, not a substitute for reading real code before
+editing it.*

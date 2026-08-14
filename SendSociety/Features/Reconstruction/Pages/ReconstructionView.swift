@@ -41,11 +41,11 @@ struct ReconstructionView: View {
     /// Previously-saved 3D-view annotations for this exact reconstruction, if this screen was
     /// reopened from a saved `ReconstructionRecord` (see `Core/Persistence`) rather than freshly
     /// generated — preloaded into `annotationState` on appear. Empty for a brand-new generation.
-    var initialAnnotationStrokes: [AnnotationStroke] = []
+    var initialAnnotationStrokes: [AnnotationStrokeModel] = []
     /// Called whenever the coach's 3D-view annotations change (add/undo/clear), so the caller can
     /// persist them back into the session — nil (the default) means "don't bother," e.g. for a
     /// reconstruction that was never saved in the first place.
-    var onAnnotationStrokesChanged: (([AnnotationStroke]) -> Void)? = nil
+    var onAnnotationStrokesChanged: (([AnnotationStrokeModel]) -> Void)? = nil
     /// The already depth-grounded positions to render when there's no fresh `poseSample`/
     /// `depthContext` to compute from — i.e. a session review reopening a previously-generated
     /// `ReconstructionEntry` (see its doc comment for why regeneration isn't possible then). nil
@@ -93,8 +93,8 @@ struct ReconstructionView: View {
         onBack: (() -> Void)? = nil,
         onFinished: (() -> Void)? = nil,
         onDelete: (() -> Void)? = nil,
-        initialAnnotationStrokes: [AnnotationStroke] = [],
-        onAnnotationStrokesChanged: (([AnnotationStroke]) -> Void)? = nil,
+        initialAnnotationStrokes: [AnnotationStrokeModel] = [],
+        onAnnotationStrokesChanged: (([AnnotationStrokeModel]) -> Void)? = nil,
         initialWorldPositions: [BodyJointName: SIMD3<Float>]? = nil,
         initialJointOverrides: [BodyJointName: SIMD3<Float>]? = nil,
         onJointOverridesChanged: (([BodyJointName: SIMD3<Float>]?) -> Void)? = nil,
@@ -131,7 +131,7 @@ struct ReconstructionView: View {
         ZStack(alignment: .top) {
             sceneArea
             if isAnnotating {
-                AnnotationOverlay(state: annotationState)
+                AnnotationComponent(annotationState: annotationState)
                     .ignoresSafeArea()
             }
             headerPanel

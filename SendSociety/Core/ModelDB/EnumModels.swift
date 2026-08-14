@@ -85,32 +85,16 @@ let skeletonBones: [SkeletonBone] = [
 /// data. `AnnotationOverlay`/`AnnotationToolbar`/`AnnotationState` (the actual drawing surface,
 /// toolbar, and `ObservableObject` state) stay in Features/Reconstruction — those genuinely are UI.
 enum AnnotationTool: String, CaseIterable, Codable {
-    case pen, line, angle
+    case pen, line, angle, circle, arrow, text
 
     var systemImage: String {
         switch self {
         case .pen: return "pencil"
         case .line: return "line.diagonal"
         case .angle: return "angle"
+        case .circle: return "circle"
+        case .arrow: return "arrow.up.right"
+        case .text: return "textformat"
         }
     }
-
-    var label: String {
-        switch self {
-        case .pen: return "Pen"
-        case .line: return "Line"
-        case .angle: return "Angle"
-        }
-    }
-}
-
-/// One piece of 2D screen-space markup drawn on a paused Step 4 view — pen (freehand), line
-/// (straight segment), or angle (two segments sharing a vertex, rendered with the angle between
-/// them labeled). Persisted as part of a `RecordingSession`'s saved video annotations/3D
-/// reconstructions (see `VideoAnnotationEntry`/`ReconstructionEntry` in `Core/Persistence`).
-struct AnnotationStroke: Identifiable, Codable, Equatable {
-    var id = UUID()
-    var tool: AnnotationTool
-    /// pen: every sampled point along the drag. line: [start, end]. angle: [vertex, endA, endB].
-    var points: [CGPoint]
 }
