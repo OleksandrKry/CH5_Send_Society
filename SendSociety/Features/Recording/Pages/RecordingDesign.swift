@@ -9,70 +9,194 @@ import SwiftUI
 
 struct RecordingDesign: View {
     
-    @State private var currentTime: Double = 30
-    @State private var duration: Double = 75
-    @State private var isPlaying = false
-    @State private var playbackRate: Double = 1
-    
     var body: some View {
-        NavigationStack {
+        ZStack {
             
-            ZStack (alignment: .topLeading) {
-                GeometryReader { proxy in
-                               Image("climbingPlaceholder")
-                                   .resizable()
-                                   .scaledToFill()
-                                   .frame(
-                                       width: proxy.size.width,
-                                       height: proxy.size.height
-                                   )
-                                   .clipped()
-                           }
-                            .ignoresSafeArea()
-
+            // MARK: Background
+            
+            Color(.tertiaryDark)
+                .ignoresSafeArea()
+            
+            // MARK: Recording Timer
+            
+            Text("00:00:00")
+                .font(.title2)
+                .monospacedDigit()
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .glassEffect(
+                    .regular,
+                    in: Capsule()
+                )
+                .frame(
+                    maxHeight: .infinity,
+                    alignment: .top
+                )
+                .padding(.top, 16)
+            
+            // MARK: Left Control
+            
+            HStack {
                 
-                ClimbInfoCard()
-                    .padding(.top, 16)
-                    .padding(.leading, 16)
+                Button {
+                    // Person / subject action
+                } label: {
+                    Image(systemName: "person")
+                        .font(.title3)
+                        .frame(
+                            width: 56,
+                            height: 56
+                        )
+                }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
+                
+                Spacer()
             }
-            .overlay(alignment: .topTrailing) {
-                                AnnotateToolbar()
-                                .padding(.top, 120)
-                                .padding(.trailing, 24)
-            }
+            .padding(.horizontal, 44)
             
-            .overlay(alignment: .bottom) {
-                           PlaybackOverlay(
-                               currentTime: $currentTime,
-                               duration: duration,
-                               isPlaying: $isPlaying,
-                               playbackRate: $playbackRate
-                           )
-            }
+            // MARK: Right Controls
             
-            .navigationTitle("Climb at Bali Boulder")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
+            VStack(spacing: 16) {
+                
+                // MARK: Resolution
+                
+                Button {
+                    // Resolution
+                } label: {
+                    VStack(spacing: 0) {
+                        Text("HD")
+                            .font(.body)
                         
-                // LEFT
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        // Close action
-                    } label: {
-                        Image(systemName: "xmark")
+                        Text("RES")
+                            .font(.caption2)
                     }
+                    .frame(
+                        width: 56,
+                        height: 56
+                    )
                 }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
                 
                 
-                // RIGHT
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button {
-                        // More action
-                    } label: {
-                        Image(systemName: "ellipsis")
+                // MARK: Frame Rate
+                
+                Button {
+                    // Frame rate
+                } label: {
+                    VStack(spacing: 0) {
+                        Text("30")
+                            .font(.body)
+                        
+                        Text("FPS")
+                            .font(.caption2)
                     }
+                    .frame(
+                        width: 56,
+                        height: 56
+                    )
+                }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
+                
+                
+                // MARK: Audio
+                
+                Button {
+                    // Audio
+                } label: {
+                    Image(systemName: "speaker.wave.2.fill")
+                        .font(.title3)
+                        .frame(
+                            width: 56,
+                            height: 56
+                        )
+                }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
+                
+                
+                // MARK: Record
+                
+                Button {
+                    // Start / stop recording
+                } label: {
+                    Circle()
+                        .fill(.red)
+                        .frame(
+                            width: 64,
+                            height: 64
+                        )
+                        .frame(
+                            width: 72,
+                            height: 72
+                        )
+                }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
+                .padding(.vertical, 8)
+                
+                // MARK: Previous Recording
+                
+                Button {
+                    // Open previous video
+                } label: {
+                    Image("climbingPlaceholder")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: 56,
+                            height: 56
+                        )
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .glassEffect(
+                    .regular,
+                    in: Circle()
+                )
+            }
+            .frame(
+                maxWidth: .infinity,
+                maxHeight: .infinity,
+                alignment: .trailing
+            )
+            .padding(.trailing, 48)
+            
+            
+            // MARK: Close
+            
+            VStack {
+                
+                Spacer()
+                
+                HStack {
+                    Spacer()
+                    
+                    Button("Session Done") {
+                        // Close recording
+                    }
+                    .buttonStyle(.glass)
                 }
             }
+            .padding(.trailing, 48)
+            .padding(.bottom, 32)
         }
     }
 }
