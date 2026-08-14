@@ -14,8 +14,9 @@
 		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
 		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
 		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
+		430BD34B302DAAD600BC92EC /* ClimbingAnnotation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430BD34A302DAACD00BC92EC /* ClimbingAnnotation.swift */; };
+		430BD34D302EAD1800BC92EC /* RecordingDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430BD34C302EAD0F00BC92EC /* RecordingDesign.swift */; };
 		4329C0B0302C6FA10036A3D3 /* AnnotateToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */; };
-		439FEFA3302B207C0096DF0A /* Typography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA2302B20710096DF0A /* Typography.swift */; };
 		439FEFA7302C47750096DF0A /* PlaybackDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA6302C47750096DF0A /* PlaybackDesign.swift */; };
 		439FEFA9302C4B310096DF0A /* ClimbInfoCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFA8302C4B310096DF0A /* ClimbInfoCard.swift */; };
 		439FEFB1302C55C70096DF0A /* PlaybackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439FEFB0302C55C70096DF0A /* PlaybackPanel.swift */; };
@@ -75,8 +76,9 @@
 		3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeshSceneView.swift; sourceTree = "<group>"; };
 		391284EDC359551A4E55B989 /* TPoseSilhouette.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TPoseSilhouette.swift; sourceTree = "<group>"; };
 		42BF999F98834402830605C8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		430BD34A302DAACD00BC92EC /* ClimbingAnnotation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimbingAnnotation.swift; sourceTree = "<group>"; };
+		430BD34C302EAD0F00BC92EC /* RecordingDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingDesign.swift; sourceTree = "<group>"; };
 		4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotateToolbar.swift; sourceTree = "<group>"; };
-		439FEFA2302B20710096DF0A /* Typography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typography.swift; sourceTree = "<group>"; };
 		439FEFA6302C47750096DF0A /* PlaybackDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackDesign.swift; sourceTree = "<group>"; };
 		439FEFA8302C4B310096DF0A /* ClimbInfoCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimbInfoCard.swift; sourceTree = "<group>"; };
 		439FEFB0302C55C70096DF0A /* PlaybackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackPanel.swift; sourceTree = "<group>"; };
@@ -282,7 +284,6 @@
 		B0E8DE97AC814F5FA1113BC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				439FEFA2302B20710096DF0A /* Typography.swift */,
 				4627689E22B94DEBB591BB78 /* Assets.xcassets */,
 				017E50A5312541079C0CCA68 /* Info.plist */,
 			);
@@ -323,6 +324,8 @@
 		D85CCAB55A88FB7D404872C9 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				430BD34C302EAD0F00BC92EC /* RecordingDesign.swift */,
+				430BD34A302DAACD00BC92EC /* ClimbingAnnotation.swift */,
 				4329C0AF302C6F8C0036A3D3 /* AnnotateToolbar.swift */,
 				D2167F61F9A0468293617CE7 /* PlaybackView.swift */,
 				3583960B4BA44CB986D33540 /* RecordingView.swift */,
@@ -451,6 +454,7 @@
 				439FEFA7302C47750096DF0A /* PlaybackDesign.swift in Sources */,
 				9EE5D285525941919F95D9DF /* ReconstructionEntityBuilder.swift in Sources */,
 				2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */,
+				430BD34D302EAD1800BC92EC /* RecordingDesign.swift in Sources */,
 				8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */,
 				9CDFDA505944DE50835DC61A /* CalibrationFrameProcessor.swift in Sources */,
 				B8ECEEC6FE101CF7B1537671 /* CalibrationHeightCorrection.swift in Sources */,
@@ -461,9 +465,9 @@
 				A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */,
 				384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */,
 				1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */,
+				430BD34B302DAAD600BC92EC /* ClimbingAnnotation.swift in Sources */,
 				439FEFB3302C56090096DF0A /* PlaybackOverlay.swift in Sources */,
 				7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */,
-				439FEFA3302B207C0096DF0A /* Typography.swift in Sources */,
 				9B1B8797B9AB48D784BAD1CB /* ARMeshSceneView.swift in Sources */,
 				B9316A1B2E38406AAC20D572 /* WallScanView.swift in Sources */,
 				9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */,

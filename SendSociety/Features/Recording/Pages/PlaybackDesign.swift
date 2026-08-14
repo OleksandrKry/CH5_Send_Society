@@ -66,23 +66,10 @@ struct PlaybackDesign: View {
                 
                 // RIGHT
                 ToolbarItemGroup(placement: .topBarTrailing) {
-                    
-                    Button {
-                        // Accessibility action
-                    } label: {
-                        Image(systemName: "figure")
-                    }
-                    
                     Button {
                         // More action
                     } label: {
                         Image(systemName: "ellipsis")
-                    }
-                    
-                    Button {
-                        // Share action
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
                     }
                 }
             }
