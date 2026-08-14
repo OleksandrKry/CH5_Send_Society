@@ -11,7 +11,7 @@ struct BodyPoseSample {
     /// joint (center of the hip), in meters.
     var rootRelativePositions: [BodyJointName: SIMD3<Float>]
     /// Apple: "a transform from the skeleton hip to the camera." Needed to place joints into
-    /// ARKit world space — see `worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)`.
+    /// ARKit world space — see `BodyPose3DExtractor.worldPosition(rootRelative:cameraOriginMatrix:cameraTransform:)`.
     var cameraOriginMatrix: simd_float4x4
     var bodyHeight: Float
 }
@@ -47,6 +47,32 @@ enum BodyPoseError: Error {
     case visionRequestFailed(Error)
 }
 
+/// FLOW OVERVIEW — this file is long because it's one continuous pipeline, not because it does
+/// many unrelated things. Read it in this order if you're tracing through it for the first time
+/// (or debugging a skeleton that looks wrong):
+///
+/// 1. `detect(inVideoFrame:deviceOrientation:)` — run Vision on a color frame, get back a
+///    `BodyPoseSample` (17 joint positions, all relative to the hip, plus a hip->camera matrix).
+///    This step never touches LiDAR — it's Vision's own estimate only.
+/// 2. `groundSkeletonRootAnchored(_:cameraOriginMatrix:context:)` — the main "make it accurate"
+///    step. Takes that `BodyPoseSample` plus a real LiDAR depth frame (`DepthGroundingContext`)
+///    and corrects ONLY the hip's depth against a real sensor reading, then scales every other
+///    joint to match (see that function's own doc comment for exactly why only the hip).
+/// 3. `worldPosition(cameraSpace:cameraTransform:)` — the last step, converting a
+///    camera-space position (what step 2 produces) into ARKit world space so it can be placed
+///    next to the wall mesh.
+///
+/// Everything else in this file is a private helper used somewhere inside step 2: reading real
+/// depth pixels (`lidarGroundedCameraSpacePosition`, `nearestConfidentDepth`,
+/// `bilateralWeightedDepth`), or fixing up which way is "up" (`rotateBearingToRawSensorFrame`,
+/// `cameraOrientation(for:)`). `projected2DImagePoints` is a separate, optional 4th step — a
+/// pure 2D sanity-check overlay, not part of the 3D grounding pipeline at all.
+///
+/// If a generated skeleton looks WRONG, the fastest way to narrow it down: wrong SHAPE (limbs
+/// disconnected, joints in impossible places) points at step 1 (Vision itself struggling with
+/// this frame); coherent shape but wrong ROTATION points at the orientation-fixing helpers;
+/// coherent shape, right rotation, wrong DISTANCE from the wall points at step 2's depth
+/// grounding.
 enum BodyPose3DExtractor {
 
     private static let jointMap: [(BodyJointName, VNHumanBodyPose3DObservation.JointName)] = [
@@ -92,7 +118,6 @@ enum BodyPose3DExtractor {
             options: [:]
         ))
     }
-//    where cg image, change the class to ciimage, where the last image generated from ar session, make it ci image, with depth value
 
     private static func runDetection(handler: VNImageRequestHandler) throws -> BodyPoseSample {
         let request = VNDetectHumanBodyPose3DRequest()
@@ -111,8 +136,6 @@ enum BodyPose3DExtractor {
             let translation = point.position.columns.3
             positions[ours] = SIMD3<Float>(translation.x, translation.y, translation.z)
         }
-//        DebugLog.reconstruction.(positions)
-            
 
         return BodyPoseSample(
             rootRelativePositions: positions,
@@ -845,9 +868,8 @@ enum BodyPose3DExtractor {
     }
 
     /// Converts a root-relative joint position into ARKit world space using Vision's OWN
-    /// estimate end-to-end (no LiDAR grounding) — the fallback path for when
-    /// `groundAllJoints`/`lidarGroundedCameraSpacePosition` can't get a confident real-depth
-    /// reading for a frame.
+    /// estimate end-to-end (no LiDAR grounding) — the fallback path `ReconstructionEntityBuilder
+    /// .worldJointPositions` uses when there's no depth data for a frame at all.
     ///
     /// Composition: world = cameraTransform * cameraOriginMatrix * rootRelativePoint.
     /// `cameraOriginMatrix` is documented by Apple as "a transform from the skeleton hip to the
@@ -855,7 +877,7 @@ enum BodyPose3DExtractor {
     /// TO Y-space, e.g. ARCamera.transform maps camera space to world space), that reads as
     /// hip-space -> camera-space. This path is noticeably less accurate than the LiDAR-grounded
     /// one (Vision's own absolute depth/scale is the known-weak axis) — prefer
-    /// `groundAllJoints` wherever real depth is available.
+    /// `groundSkeletonRootAnchored` wherever real depth is available.
     static func worldPosition(
         rootRelative: SIMD3<Float>,
         cameraOriginMatrix: simd_float4x4,

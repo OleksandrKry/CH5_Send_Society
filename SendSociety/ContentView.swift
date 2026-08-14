@@ -145,9 +145,13 @@ struct ReconstructionInput {
     let pausedSeconds: TimeInterval
 }
 
-/// Runs the Step 4 Vision request for the paused frame once, then hosts ReconstructionView.
-/// Kept separate from ContentView so the Vision call happens exactly once per "Generate" tap
-/// rather than on every SwiftUI body re-evaluation.
+/// Hosts `ReconstructionView` for Step 4, and runs the "load an existing 3D pose, or detect a
+/// new one" decision exactly once per "Generate" tap (via `.onAppear`) rather than on every
+/// SwiftUI body re-evaluation.
+///
+/// THIS FILE IS UI ONLY for that decision — it never talks to `LiveReconstructionGenerator` or
+/// `RecordingSession.reconstructions` directly, it asks `ReconstructionHostEngine` (see that
+/// file) to do it, and just holds the answer in `result`.
 private struct ReconstructionHost: View {
     let arManager: ARSessionManager
     let input: ReconstructionInput
@@ -160,156 +164,75 @@ private struct ReconstructionHost: View {
     let onBack: () -> Void
     var onFinished: () -> Void = {}
 
-    @State private var poseSample: BodyPoseSample?
-    @State private var cameraTransform: simd_float4x4 = matrix_identity_float4x4
-    /// See `ReconstructionView.cameraTransform`'s doc comment — nil unless `generate()` just ran a
-    /// fresh detection against real stored frame data, so `ReconstructionView` never seeds its
-    /// camera from a meaningless placeholder transform.
-    @State private var recordingCameraTransform: simd_float4x4?
-    @State private var depthContext: BodyPose3DExtractor.DepthGroundingContext?
-    @State private var poseError: String?
-    @State private var isReady = false
-
-    /// Set either by loading an existing `ReconstructionEntry` near `input.pausedSeconds`, or by
-    /// computing fresh detected positions after a successful Vision call — see `generate()`. This
-    /// is what actually gets rendered (via `ReconstructionView.initialWorldPositions`) AND what
-    /// every subsequent `upsertReconstruction()` call writes back as `ReconstructionEntry
-    /// .worldPositions` — it's the stable "auto-detected baseline," never the coach's edits.
-    @State private var entryBaseWorldPositions: [BodyJointName: SIMD3<Float>] = [:]
-    @State private var entryTimestamp: Double = 0
-    /// True once a saved `ReconstructionEntry` was found and loaded for this exact paused moment —
-    /// when true, Vision is never run at all (see `generate()` and `RecordingSession`'s doc comment
-    /// on why a previously-unanalyzed timestamp in a revisited session can't get a NEW
-    /// reconstruction after the fact — this isn't that case, since the coach paused at the same
-    /// spot a reconstruction already exists for).
-    @State private var loadedFromSavedEntry = false
-    @State private var initialWorldPositions: [BodyJointName: SIMD3<Float>]?
-    @State private var initialJointOverrides: [BodyJointName: SIMD3<Float>]?
-    @State private var initialAnnotationStrokes: [AnnotationStroke] = []
+    /// Everything needed to render the 3D view, once `loadOrGenerateReconstruction()` has run —
+    /// nil beforehand, which is what shows the "Reconstructing…" spinner.
+    @State private var result: ReconstructionResult?
     /// Mirrors of whatever `ReconstructionView` currently has for these — updated by its
     /// onChange callbacks, and written into the saved `ReconstructionEntry` on every change (see
-    /// `upsertReconstruction()`).
-    @State private var lastJointOverrides: [BodyJointName: SIMD3<Float>]?
-    @State private var lastAnnotationStrokes: [AnnotationStroke] = []
+    /// `saveCurrentReconstruction()`).
+    @State private var currentJointOverrides: [BodyJointName: SIMD3<Float>]?
+    @State private var currentAnnotationStrokes: [AnnotationStroke] = []
 
     var body: some View {
         Group {
-            if isReady {
+            if let result {
                 ReconstructionView(
                     // wallMeshSnapshot (frozen the moment recording starts), NOT the live meshAnchors —
                     // see ARSessionManager.wallMeshSnapshot for why: the live list keeps growing
                     // through Steps 2-3 and picks up floor/clutter/residual body-shaped mesh.
                     wallAnchors: arManager.wallMeshSnapshot,
                     wallTextureReference: arManager.wallTextureReference,
-                    poseSample: poseSample,
-                    cameraTransform: recordingCameraTransform,
-                    depthContext: depthContext,
-                    poseError: poseError,
+                    poseSample: result.poseSample,
+                    cameraTransform: result.cameraTransform,
+                    depthContext: result.depthContext,
+                    poseError: result.poseError,
                     onBack: onBack,
                     onFinished: onFinished,
-                    initialAnnotationStrokes: initialAnnotationStrokes,
+                    initialAnnotationStrokes: result.initialAnnotationStrokes,
                     onAnnotationStrokesChanged: { strokes in
-                        lastAnnotationStrokes = strokes
-                        upsertReconstruction()
+                        currentAnnotationStrokes = strokes
+                        saveCurrentReconstruction()
                     },
-                    initialWorldPositions: initialWorldPositions,
-                    initialJointOverrides: initialJointOverrides,
+                    initialWorldPositions: result.initialWorldPositions,
+                    initialJointOverrides: result.initialJointOverrides,
                     onJointOverridesChanged: { overrides in
-                        lastJointOverrides = overrides
-                        upsertReconstruction()
+                        currentJointOverrides = overrides
+                        saveCurrentReconstruction()
                     }
                 )
             } else {
                 ProgressView("Reconstructing…")
             }
         }
-        .onAppear(perform: generate)
+        .onAppear(perform: loadOrGenerateReconstruction)
+    }
+
+    private func loadOrGenerateReconstruction() {
+        let newResult = ReconstructionHostEngine.loadOrGenerate(input: input, session: session, wallReference: arManager.wallTextureReference)
+        result = newResult
+        currentJointOverrides = newResult.initialJointOverrides
+        currentAnnotationStrokes = newResult.initialAnnotationStrokes
+
+        // Freshly generated (not loaded from a save) — save it right away, so a scrubber marker
+        // appears for this timestamp immediately rather than only after the coach edits something.
+        if !newResult.wasLoadedFromSavedEntry, newResult.initialWorldPositions != nil {
+            saveCurrentReconstruction()
+        }
     }
 
     /// Writes the current in-memory reconstruction state (baseline + any edit/annotations) back
-    /// into `session`, if one exists — called after a fresh "Generate" succeeds, and again every
-    /// time the coach drags a joint or marks up the view. No-ops silently if there's no session to
-    /// save into (see `session`'s doc comment).
-    private func upsertReconstruction() {
-        guard let session, let sessionStore else { return }
-        let entry = ReconstructionEntry(
-            timestampSeconds: entryTimestamp,
-            worldPositions: entryBaseWorldPositions,
-            jointOverrides: lastJointOverrides,
-            annotationStrokes: lastAnnotationStrokes
+    /// into `session` — called right after a fresh "Generate" succeeds, and again every time the
+    /// coach drags a joint or marks up the view. Delegates the actual save to
+    /// `ReconstructionHostEngine`, which no-ops if there's no session to save into.
+    private func saveCurrentReconstruction() {
+        guard let result else { return }
+        ReconstructionHostEngine.save(
+            session: session,
+            sessionStore: sessionStore,
+            timestampSeconds: result.timestampSeconds,
+            baseWorldPositions: result.baseWorldPositions,
+            jointOverrides: currentJointOverrides,
+            annotationStrokes: currentAnnotationStrokes
         )
-        session.upsertReconstruction(entry)
-        sessionStore.save()
-    }
-
-    private func generate() {
-        entryTimestamp = input.pausedSeconds
-
-        // A reconstruction already exists for (near enough) this exact paused moment — load it
-        // directly rather than re-running Vision. This is a "load," not a "regenerate": see
-        // `RecordingSession.swift`'s `ReconstructionEntry` doc comment for why a NEW reconstruction
-        // at a previously-unanalyzed timestamp isn't possible after the live AR session ends, but
-        // that's not what's happening here since a saved entry for this exact spot already exists.
-        if let session, let existing = session.reconstructions.first(where: { abs($0.timestampSeconds - input.pausedSeconds) <= 0.3 }) {
-            entryTimestamp = existing.timestampSeconds
-            entryBaseWorldPositions = existing.worldPositions
-            initialWorldPositions = existing.worldPositions
-            initialJointOverrides = existing.jointOverrides
-            lastJointOverrides = existing.jointOverrides
-            initialAnnotationStrokes = existing.annotationStrokes
-            lastAnnotationStrokes = existing.annotationStrokes
-            loadedFromSavedEntry = true
-            isReady = true
-            DebugLog.reconstruction.info("Loaded saved reconstruction for t=\(existing.timestampSeconds, privacy: .public)s — skipping Vision")
-            return
-        }
-
-        // The actual detection/grounding algorithm lives in
-        // `LiveReconstructionGenerator` (Core/PoseReconstruction) — this just wires this screen's
-        // input/state to it and copies the result back out. See that type's doc comment for why it
-        // was pulled out of here.
-        do {
-            let result = try LiveReconstructionGenerator.generate(
-                input: input,
-                wallReference: arManager.wallTextureReference
-            )
-            cameraTransform = result.cameraTransform
-            // Separate from `cameraTransform` above (which stays non-optional) — this is
-            // specifically "do we have a REAL per-frame recording transform to seed the 3D-view
-            // camera with," passed straight through to `ReconstructionView`. Only ever set here, on
-            // the fresh-detection path — stays nil for a loaded saved entry (see the early return
-            // above) or if generation threw, neither of which has a trustworthy per-frame camera
-            // pose to seed a camera from.
-            recordingCameraTransform = result.cameraTransform
-            depthContext = result.depthContext
-            poseSample = result.poseSample
-            poseError = result.poseError
-
-            if let worldPositions = result.worldPositions {
-                // Freshly generated (not loaded) — save it right away, per feedback item #2's
-                // "indicator in specific frame if that's already 3d generated": this is the moment
-                // a scrubber tick mark should appear for this timestamp. `entryBaseWorldPositions`
-                // is the baseline every later edit/annotation upsert writes on top of (see
-                // `upsertReconstruction()`).
-                entryBaseWorldPositions = worldPositions
-                // Render from these FINAL positions directly, matching the loaded-saved-entry path
-                // above (`initialWorldPositions = existing.worldPositions`). The old behavior left
-                // this unset here, so `ReconstructionView` fell back to re-deriving positions from
-                // `poseSample` instead. See `LiveReconstructionGenerator.Result.worldPositions`'s
-                // doc comment.
-                initialWorldPositions = worldPositions
-                upsertReconstruction()
-            }
-        } catch LiveReconstructionGenerator.GenerationError.noStoredFrameData {
-            poseError = "No stored depth/camera data for this moment in the video."
-        } catch LiveReconstructionGenerator.GenerationError.couldNotReadFrame {
-            poseError = "Couldn't read this frame from the recording — try a different moment in the video."
-        } catch {
-            poseError = "Something went wrong generating this reconstruction — try a different moment in the video."
-            let description = String(describing: error)
-            DebugLog.reconstruction.error("LiveReconstructionGenerator.generate threw an unexpected error: \(description, privacy: .public)")
-        }
-
-        isReady = true
     }
 }

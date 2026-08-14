@@ -615,7 +615,7 @@ enum ReconstructionEntityBuilder {
         if !hideMannequinBody {
             for bone in skeletonBones {
                 guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
-                if let capsule = capsuleBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
+                if let capsule = cylinderBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
                     root.addChild(capsule)
                 }
             }
@@ -699,32 +699,15 @@ enum ReconstructionEntityBuilder {
         return maxRadius
     }
 
-    /// Mannequin limb segment: same rotate-a-cylinder-onto-a-direction trick as `cylinderBetween`
-    /// (in fact identical geometry — `MeshResource.generateCapsule` doesn't exist on this
-    /// RealityKit version, confirmed by a real build error, so this is a plain cylinder). The
-    /// rounded-off look comes from `skeletonEntity` also dropping a sphere at every joint (see
-    /// `mannequinJointRadius`) sized to match the thickest connected limb, which covers the flat
-    /// cylinder end caps instead of leaving visible seams at the joints.
-    private static func capsuleBetween(_ a: SIMD3<Float>, _ b: SIMD3<Float>, radius: Float, material: Material) -> Entity? {
-        let distance = simd_distance(a, b)
-        guard distance > 0.001 else { return nil }
-        let mesh = MeshResource.generateCylinder(height: distance, radius: radius)
-        let entity = ModelEntity(mesh: mesh, materials: [material])
-        entity.position = (a + b) / 2
-
-        let direction = normalize(b - a)
-        let up = SIMD3<Float>(0, 1, 0)
-        let dot = simd_dot(up, direction)
-        if dot < -0.9999 {
-            entity.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
-        } else if dot < 0.9999 {
-            let axis = normalize(simd_cross(up, direction))
-            let angle = acos(dot)
-            entity.orientation = simd_quatf(angle: angle, axis: axis)
-        }
-        return entity
-    }
-
+    /// Builds a cylinder mesh stretching from `a` to `b` and rotates it to point the right way —
+    /// used for BOTH the thin red skeleton bones AND the thicker tan mannequin limb "capsules"
+    /// (there's no real capsule mesh here: `MeshResource.generateCapsule` doesn't exist on this
+    /// RealityKit version, confirmed by a real build error, so a plain cylinder stands in for one
+    /// in both places — they used to be two separate, identical copies of this same function).
+    /// For the mannequin case, the rounded-off look comes from `skeletonEntity` also dropping a
+    /// sphere at every joint (see `mannequinJointRadius`) sized to match the thickest connected
+    /// limb, which covers the flat cylinder end caps instead of leaving visible seams at the
+    /// joints.
     private static func cylinderBetween(_ a: SIMD3<Float>, _ b: SIMD3<Float>, radius: Float, material: Material) -> Entity? {
         let distance = simd_distance(a, b)
         guard distance > 0.001 else { return nil }

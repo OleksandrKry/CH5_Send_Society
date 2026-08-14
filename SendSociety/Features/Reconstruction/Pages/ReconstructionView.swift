@@ -119,77 +119,22 @@ struct ReconstructionView: View {
         _hasEditedPose = State(initialValue: initialJointOverrides != nil)
     }
 
+    // THIS FILE IS UI ONLY — the joint-drag gesture state machine, camera orbit/pan/zoom, and
+    // RealityKit rendering all live in `ReconstructionSceneView` (a `UIViewRepresentable` +
+    // `Coordinator`, which is already its own self-contained "engine" for that gesture surface —
+    // not duplicated or re-wrapped here). This page just holds simple toggle state (which mode is
+    // active, whether annotating) and forwards it down via bindings/callbacks. Redesigning the
+    // header/banners/buttons only requires editing this file; the 3D scene itself is a separate
+    // component you compose into whatever new layout you build.
+
     var body: some View {
         ZStack(alignment: .top) {
-            ReconstructionSceneView(wallAnchors: wallAnchors, wallTextureReference: wallTextureReference, poseSample: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, isEditingPose: isEditingPose, jointOverrides: $jointOverrides, draggedJoint: $draggedJoint, hasEditedPose: $hasEditedPose, initialWorldPositions: initialWorldPositions)
-                .ignoresSafeArea()
-                .allowsHitTesting(!isAnnotating)
-
+            sceneArea
             if isAnnotating {
                 AnnotationOverlay(state: annotationState)
                     .ignoresSafeArea()
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    if let onBack {
-                        Button(action: onBack) {
-                            Label("Back to video", systemImage: "chevron.left")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                    if let onFinished {
-                        Button(action: onFinished) {
-                            Label("Done", systemImage: "checkmark")
-                        }
-                        .buttonStyle(.borderedProminent)
-                    }
-                    if onDelete != nil {
-                        Button(role: .destructive) {
-                            isConfirmingDelete = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
-                    }
-                    Spacer()
-                    modeControls
-                }
-                Text("Step 4 — Static 3D Reconstruction").font(.headline)
-                if isApproximate {
-                    Label("Estimated placement — no LiDAR depth for this moment, so this uses Vision's own estimate and the wall's saved camera position. Less precise than a live-generated view.", systemImage: "exclamationmark.triangle")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                }
-                // No climber detected in this frame — no longer a blocking error. Checking the
-                // wall scan / camera angle / texture mapping in isolation (no body needed at all)
-                // is a normal, useful thing to do on its own, so this just informs rather than
-                // stopping the coach from viewing the wall reconstruction.
-                if let poseError {
-                    Label("No climber detected in this frame — showing wall only. \(poseError)", systemImage: "person.fill.questionmark")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                if isEditingPose {
-                    Text("Tap a joint to select it — the camera locks and the joint highlights. Drag near it to correct it (connected limbs move with it, limited to roughly what a real joint allows). Tap elsewhere to finish, or tap another joint to switch.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else if isAnnotating {
-                    Text("Draw on the view to mark it up — pen, line, and angle tools below.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("One-finger drag to orbit • two-finger drag to pan • pinch to zoom. Single static frame — no animation or playback.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .padding()
-
+            headerPanel
             if isAnnotating {
                 AnnotationToolbar(state: annotationState)
                     .padding()
@@ -221,42 +166,140 @@ struct ReconstructionView: View {
         }
     }
 
+    // MARK: - The 3D scene itself (wall + skeleton, orbit/pan/zoom, joint editing)
+
+    private var sceneArea: some View {
+        ReconstructionSceneView(wallAnchors: wallAnchors, wallTextureReference: wallTextureReference, poseSample: poseSample, cameraTransform: cameraTransform, depthContext: depthContext, isEditingPose: isEditingPose, jointOverrides: $jointOverrides, draggedJoint: $draggedJoint, hasEditedPose: $hasEditedPose, initialWorldPositions: initialWorldPositions)
+            .ignoresSafeArea()
+            .allowsHitTesting(!isAnnotating)
+    }
+
+    // MARK: - Top overlay panel: back/done/delete buttons, mode controls, status text
+
+    private var headerPanel: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            topButtonRow
+            Text("Step 4 — Static 3D Reconstruction").font(.headline)
+            if isApproximate {
+                approximatePlacementBanner
+            }
+            if let poseError {
+                noClimberDetectedBanner(poseError)
+            }
+            modeInstructions
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .padding()
+    }
+
+    private var topButtonRow: some View {
+        HStack {
+            if let onBack {
+                Button(action: onBack) {
+                    Label("Back to video", systemImage: "chevron.left")
+                }
+                .buttonStyle(.bordered)
+            }
+            if let onFinished {
+                Button(action: onFinished) {
+                    Label("Done", systemImage: "checkmark")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            if onDelete != nil {
+                Button(role: .destructive) {
+                    isConfirmingDelete = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+            }
+            Spacer()
+            modeControls
+        }
+    }
+
+    private var approximatePlacementBanner: some View {
+        Label("Estimated placement — no LiDAR depth for this moment, so this uses Vision's own estimate and the wall's saved camera position. Less precise than a live-generated view.", systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.orange)
+    }
+
+    // No climber detected in this frame — no longer a blocking error. Checking the wall scan /
+    // camera angle / texture mapping in isolation (no body needed at all) is a normal, useful
+    // thing to do on its own, so this just informs rather than stopping the coach from viewing
+    // the wall reconstruction.
+    private func noClimberDetectedBanner(_ poseError: String) -> some View {
+        Label("No climber detected in this frame — showing wall only. \(poseError)", systemImage: "person.fill.questionmark")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    /// Short instructions that change depending on which mode is active — editing a pose,
+    /// drawing, or plain view/orbit.
+    private var modeInstructions: some View {
+        Group {
+            if isEditingPose {
+                Text("Tap a joint to select it — the camera locks and the joint highlights. Drag near it to correct it (connected limbs move with it, limited to roughly what a real joint allows). Tap elsewhere to finish, or tap another joint to switch.")
+            } else if isAnnotating {
+                Text("Draw on the view to mark it up — pen, line, and angle tools below.")
+            } else {
+                Text("One-finger drag to orbit • two-finger drag to pan • pinch to zoom. Single static frame — no animation or playback.")
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+    }
+
     /// Mode-switch buttons — view/orbit (default), edit-pose, and annotate are mutually
     /// exclusive, since their gestures would otherwise fight over the same one-finger drag.
     /// Tapping a mode again turns it off (back to plain view/orbit).
     private var modeControls: some View {
         HStack(spacing: 8) {
             if hasEditedPose {
-                Button("Reset Pose") {
-                    jointOverrides = nil
-                    hasEditedPose = false
-                    draggedJoint = nil
-                }
-                .buttonStyle(.bordered)
-                .font(.footnote)
+                resetPoseButton
             }
-            Button {
-                isAnnotating = false
-                isEditingPose.toggle()
-            } label: {
-                Label("Edit Pose", systemImage: "hand.draw")
-            }
-            .buttonStyle(.bordered)
-            .tint(isEditingPose ? .green : nil)
-            .font(.footnote)
-
-            Button {
-                isEditingPose = false
-                isAnnotating.toggle()
-            } label: {
-                Label("Annotate", systemImage: "pencil.tip")
-            }
-            .buttonStyle(.bordered)
-            .tint(isAnnotating ? .orange : nil)
-            .font(.footnote)
+            editPoseButton
+            annotateButton
         }
     }
 
+    private var resetPoseButton: some View {
+        Button("Reset Pose") {
+            jointOverrides = nil
+            hasEditedPose = false
+            draggedJoint = nil
+        }
+        .buttonStyle(.bordered)
+        .font(.footnote)
+    }
+
+    private var editPoseButton: some View {
+        Button {
+            isAnnotating = false
+            isEditingPose.toggle()
+        } label: {
+            Label("Edit Pose", systemImage: "hand.draw")
+        }
+        .buttonStyle(.bordered)
+        .tint(isEditingPose ? .green : nil)
+        .font(.footnote)
+    }
+
+    private var annotateButton: some View {
+        Button {
+            isEditingPose = false
+            isAnnotating.toggle()
+        } label: {
+            Label("Annotate", systemImage: "pencil.tip")
+        }
+        .buttonStyle(.bordered)
+        .tint(isAnnotating ? .orange : nil)
+        .font(.footnote)
+    }
 }
 
 // `ReconstructionSceneView` (the RealityKit UIViewRepresentable rendering component + its
