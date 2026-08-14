@@ -10,8 +10,10 @@
 		05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD60C283C01847C79E70DCB9 /* ContentView.swift */; };
 		1A5B393845494E32BFE2894E /* RecordingSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = FCD86D16F0074C0880EC5727 /* RecordingSession.swift */; };
 		1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3583960B4BA44CB986D33540 /* RecordingView.swift */; };
+		378B628210BC84C2FE096DF0 /* RecordingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A07E93D411E52D80BD16581 /* RecordingEngine.swift */; };
 		2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */; };
 		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
+		DC9F38EBD4AEF3CFF2222AA4 /* LibraryEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A2EACC8906161F57BB8245E /* LibraryEngine.swift */; };
 		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
 		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
 		4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */; };
@@ -36,14 +38,18 @@
 		9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */; };
 		A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC77F88F367F475B9C52ADE4 /* SessionStore.swift */; };
 		A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2167F61F9A0468293617CE7 /* PlaybackView.swift */; };
+		18D235F2DD5FE6F2CA7739D8 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABB3C7555213BF17F8CE38E /* PlaybackEngine.swift */; };
 		BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11847F3954984489906204D4 /* ARSessionManager.swift */; };
 		C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD01BFB14BE3474B9C27A515 /* WallScanArchive.swift */; };
 		CBBB70CAFB0843AEA722A6CA /* SessionReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */; };
+		258F62494496BAB5F5CA9C67 /* SessionReviewEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A8DB664E5390FD4343895D /* SessionReviewEngine.swift */; };
 		D3373B559DA7FDC2CCE1AF39 /* SkeletonImageOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 925CFC13EAECBC1BFF788E21 /* SkeletonImageOverlayView.swift */; };
 		D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 230F572E3FAC418F97998530 /* PixelBufferCopy.swift */; };
 		D96EA0DEEE064E5AA1092966 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42BF999F98834402830605C8 /* Models.swift */; };
 		F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */; };
+		5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */; };
 		F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */; };
+		F3DC1764951FA8061E0DF52F /* ReconstructionHostEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADEEADC9E849C7964C57688C /* ReconstructionHostEngine.swift */; };
 		F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD5512CAFDE841AFB01DCEDF /* SessionFileStore.swift */; };
 /* End PBXBuildFile section */
 
@@ -54,20 +60,24 @@
 		11847F3954984489906204D4 /* ARSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARSessionManager.swift; sourceTree = "<group>"; };
 		1375FE7813366E388AB7E771 /* AnnotationOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationOverlay.swift; sourceTree = "<group>"; };
 		173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionReviewView.swift; sourceTree = "<group>"; };
+		34A8DB664E5390FD4343895D /* SessionReviewEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionReviewEngine.swift; sourceTree = "<group>"; };
 		1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SendSocietyApp.swift; sourceTree = "<group>"; };
 		20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableSIMD.swift; sourceTree = "<group>"; };
 		230F572E3FAC418F97998530 /* PixelBufferCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBufferCopy.swift; sourceTree = "<group>"; };
 		27E4A34523354A76B854D9EF /* SendSociety.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SendSociety.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3583960B4BA44CB986D33540 /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
+		9A07E93D411E52D80BD16581 /* RecordingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingEngine.swift; sourceTree = "<group>"; };
 		3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeshSceneView.swift; sourceTree = "<group>"; };
 		A616EBAFCA4445988B933BE9 /* MeshToggleButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeshToggleButton.swift; sourceTree = "<group>"; };
 		42BF999F98834402830605C8 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BodyPose3DExtractor.swift; sourceTree = "<group>"; };
+		FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonPresenceDetector.swift; sourceTree = "<group>"; };
 		4A4112C095C146E58E9D5A8F /* CalibrationFrameProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalibrationFrameProcessor.swift; sourceTree = "<group>"; };
 		500D29FCCF4E063083C3AC44 /* GripClassifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GripClassifier.swift; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionView.swift; sourceTree = "<group>"; };
+		ADEEADC9E849C7964C57688C /* ReconstructionHostEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionHostEngine.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
 		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
 		925CFC13EAECBC1BFF788E21 /* SkeletonImageOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonImageOverlayView.swift; sourceTree = "<group>"; };
@@ -83,7 +93,9 @@
 		C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionEstimator.swift; sourceTree = "<group>"; };
 		CD60C283C01847C79E70DCB9 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		CDC3371247FC4A41A1F41C0F /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		7A2EACC8906161F57BB8245E /* LibraryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEngine.swift; sourceTree = "<group>"; };
 		D2167F61F9A0468293617CE7 /* PlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackView.swift; sourceTree = "<group>"; };
+		5ABB3C7555213BF17F8CE38E /* PlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
 		D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionSceneView.swift; sourceTree = "<group>"; };
 		D861829D58114A9AADE83B96 /* DebugLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		D5D86334302B42F0ADDD357A /* DeveloperSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeveloperSettings.swift; sourceTree = "<group>"; };
@@ -129,7 +141,9 @@
 			isa = PBXGroup;
 			children = (
 				CDC3371247FC4A41A1F41C0F /* LibraryView.swift */,
+				7A2EACC8906161F57BB8245E /* LibraryEngine.swift */,
 				173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */,
+				34A8DB664E5390FD4343895D /* SessionReviewEngine.swift */,
 				A4F7D25D182668360857835C /* SavedReconstructionReviewView.swift */,
 			);
 			path = Pages;
@@ -151,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */,
+				ADEEADC9E849C7964C57688C /* ReconstructionHostEngine.swift */,
 			);
 			path = Pages;
 			sourceTree = "<group>";
@@ -217,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */,
+				FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */,
 				F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */,
 				F50D55652D0B4F23BE8409BD /* ReconstructionEntityBuilder.swift */,
 				C37A54AE2B8F917D19E6ECFF /* ReconstructionEstimator.swift */,
@@ -270,7 +286,9 @@
 			isa = PBXGroup;
 			children = (
 				D2167F61F9A0468293617CE7 /* PlaybackView.swift */,
+				5ABB3C7555213BF17F8CE38E /* PlaybackEngine.swift */,
 				3583960B4BA44CB986D33540 /* RecordingView.swift */,
+				9A07E93D411E52D80BD16581 /* RecordingEngine.swift */,
 			);
 			path = Pages;
 			sourceTree = "<group>";
@@ -381,6 +399,7 @@
 				05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */,
 				BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */,
 				F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */,
+				5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */,
 				5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */,
 				668D2FDE36D8430C9E10EED4 /* DeveloperSettings.swift in Sources */,
 				66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */,
@@ -392,11 +411,14 @@
 				8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */,
 				346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */,
 				F668B3938FDB40DAACED4905 /* ReconstructionView.swift in Sources */,
+				F3DC1764951FA8061E0DF52F /* ReconstructionHostEngine.swift in Sources */,
 				742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */,
 				A3B31954D9F04BABBDD6A85A /* PlaybackView.swift in Sources */,
+				18D235F2DD5FE6F2CA7739D8 /* PlaybackEngine.swift in Sources */,
 				384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */,
 				D3373B559DA7FDC2CCE1AF39 /* SkeletonImageOverlayView.swift in Sources */,
 				1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */,
+				378B628210BC84C2FE096DF0 /* RecordingEngine.swift in Sources */,
 				7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */,
 				9B1B8797B9AB48D784BAD1CB /* ARMeshSceneView.swift in Sources */,
 				EBDE42897A9A40BAAC39292C /* MeshToggleButton.swift in Sources */,
@@ -410,8 +432,10 @@
 				F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */,
 				A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */,
 				CBBB70CAFB0843AEA722A6CA /* SessionReviewView.swift in Sources */,
+				258F62494496BAB5F5CA9C67 /* SessionReviewEngine.swift in Sources */,
 				84413822E37CD7F0C740DFB0 /* SavedReconstructionReviewView.swift in Sources */,
 				2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */,
+				DC9F38EBD4AEF3CFF2222AA4 /* LibraryEngine.swift in Sources */,
 				893831028987895049D28E3F /* SessionRow.swift in Sources */,
 				7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */,
 				9702347BBA1E4DC8BEDFAB0B /* DeviceDiagnostics.swift in Sources */,

@@ -59,10 +59,35 @@ final class AnnotationState: ObservableObject {
 
 struct AnnotationOverlay: View {
     @ObservedObject var state: AnnotationState
+    /// True (the default) draws the strokes AND captures drag touches to draw new ones — this is
+    /// the original, only behavior this view used to have, still what both `ReconstructionView`
+    /// call sites want for their interactive Annotate mode.
+    ///
+    /// False renders the exact same `canvasContent` but attaches neither `.contentShape` nor the
+    /// drawing `.gesture` — a pure, read-only "show whatever's already saved" mode, so a caller can
+    /// overlay it on a paused, non-annotate-mode video (see `PlaybackView`/`SessionReviewView`'s
+    /// auto-preview) WITHOUT stealing touches that should still reach the play/pause/scrub controls
+    /// underneath or beside it.
+    var isInteractive: Bool = true
     @State private var liveStroke: [CGPoint] = []
     @State private var liveAngleEnd: CGPoint?
 
     var body: some View {
+        if isInteractive {
+            canvasContent
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged(handleChanged)
+                        .onEnded(handleEnded)
+                )
+        } else {
+            canvasContent
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var canvasContent: some View {
         Canvas { context, _ in
             for stroke in state.strokes {
                 draw(stroke: stroke, in: &context)
@@ -82,12 +107,6 @@ struct AnnotationOverlay: View {
                 }
             }
         }
-        .contentShape(Rectangle())
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged(handleChanged)
-                .onEnded(handleEnded)
-        )
     }
 
     private func handleChanged(_ value: DragGesture.Value) {

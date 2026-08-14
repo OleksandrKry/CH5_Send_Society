@@ -1,21 +1,38 @@
 import SwiftUI
 import SwiftData
 
-/// The app's default landing page (feedback item #2) — an OnForm-style chronological list of
-/// every recorded session, each showing whether it has saved 3D reconstructions to revisit, with
-/// a "New Recording" entry point into the existing 4-step capture pipeline (`ContentView`).
+/// The app's default landing page — a chronological list of every recorded session, each showing
+/// whether it has saved 3D reconstructions to revisit, with a "New Recording" entry point into
+/// the existing 4-step capture pipeline (`ContentView`).
 ///
-/// NAVIGATION SHAPE: this is now the app's actual root (see `SendSocietyApp`). `ContentView` (the
+/// NAVIGATION SHAPE: this is the app's actual root (see `SendSocietyApp`). `ContentView` (the
 /// Steps 1-4 pipeline) and `SessionReviewView` (revisiting a saved session) are both presented
-/// full-screen FROM here and always return back here when done — neither one is reachable any
-/// other way anymore.
+/// full-screen FROM here and always return back here when done.
+///
+/// THIS FILE IS UI ONLY. It never talks to `SessionStore` directly for loading/filtering/deleting
+/// — it asks `LibraryEngine` (see that file) to do it. If you're redesigning this screen's look,
+/// this is the only file you should need to touch.
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
+
+    // MARK: - Plain on-screen state
+
     @State private var sessionStore: SessionStore?
     @State private var sessions: [RecordingSession] = []
     @State private var isPresentingNewRecording = false
     @State private var reviewingSession: RecordingSession?
     @State private var searchText = ""
+
+    /// The "brain" for this screen — built fresh from `sessionStore` since it holds no state of
+    /// its own. nil until `sessionStore` exists (see `setUpIfNeeded()`).
+    private var engine: LibraryEngine? {
+        sessionStore.map { LibraryEngine(sessionStore: $0) }
+    }
+
+    /// `sessions`, narrowed down by whatever's typed into the search field.
+    private var filteredSessions: [RecordingSession] {
+        engine?.sessions(sessions, matching: searchText) ?? []
+    }
 
     var body: some View {
         NavigationStack {
@@ -40,34 +57,20 @@ struct LibraryView: View {
             }
         }
         .searchable(text: $searchText, prompt: "Search recordings")
-        .onAppear {
-            if sessionStore == nil {
-                sessionStore = SessionStore(modelContext: modelContext)
-            }
-            refresh()
-        }
-        .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: refresh) {
+        .onAppear(perform: setUpIfNeeded)
+        .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: reloadSessions) {
             ContentView(onFinished: {
                 isPresentingNewRecording = false
-                refresh()
+                reloadSessions()
             })
         }
-        .fullScreenCover(item: $reviewingSession, onDismiss: refresh) { session in
+        .fullScreenCover(item: $reviewingSession, onDismiss: reloadSessions) { session in
             if let sessionStore {
                 SessionReviewView(session: session, sessionStore: sessionStore, onClose: {
                     reviewingSession = nil
                 })
             }
         }
-    }
-
-    private func refresh() {
-        sessions = sessionStore?.fetchAll() ?? []
-    }
-
-    private var filteredSessions: [RecordingSession] {
-        guard !searchText.isEmpty else { return sessions }
-        return sessions.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
     }
 
     private var sessionList: some View {
@@ -80,17 +83,9 @@ struct LibraryView: View {
                 }
                 .buttonStyle(.plain)
             }
-            .onDelete(perform: delete)
+            .onDelete(perform: deleteSessions)
         }
         .listStyle(.plain)
-    }
-
-    private func delete(at offsets: IndexSet) {
-        guard let sessionStore else { return }
-        for index in offsets {
-            sessionStore.delete(filteredSessions[index])
-        }
-        refresh()
     }
 
     private var emptyStateView: some View {
@@ -132,11 +127,36 @@ struct LibraryView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
+
+    // MARK: - Actions
+    // Functions a redesigned View's buttons/lifecycle hooks should call.
+
+    /// Creates the `SessionStore` (needs `modelContext` from the environment, so it can't be
+    /// built any earlier than this) the first time this screen appears, then loads the list.
+    private func setUpIfNeeded() {
+        guard sessionStore == nil else { return }
+        sessionStore = SessionStore(modelContext: modelContext)
+        reloadSessions()
+    }
+
+    /// Re-reads every saved session from disk. Call after anything that could have changed the
+    /// list — finishing a new recording, returning from a review screen, deleting a row.
+    private func reloadSessions() {
+        sessions = engine?.loadAllSessions() ?? []
+    }
+
+    private func deleteSessions(at offsets: IndexSet) {
+        guard let engine else { return }
+        for index in offsets {
+            engine.deleteSession(filteredSessions[index])
+        }
+        reloadSessions()
+    }
 }
 
-// `SessionRow` (one row in the library list) has moved to Features/Library/Components/SessionRow.swift
-// — a reusable rendering primitive, not page logic, so it lives separately for a frontend developer
-// to find and edit on its own.
+// `SessionRow` (one row in the library list) lives in
+// Features/Library/Components/SessionRow.swift — a reusable rendering primitive, not page logic,
+// so it lives separately for a frontend developer to find and edit on its own.
 
 // Preview note: an in-memory, throwaway SwiftData store — nothing here touches the real on-device
 // database. Shows the empty state (no sessions yet); see `#Preview("With sessions")` below for the

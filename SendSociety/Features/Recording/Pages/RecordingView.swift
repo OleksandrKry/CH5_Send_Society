@@ -2,51 +2,52 @@ import SwiftUI
 import ARKit
 import AVKit
 
-/// Step 2 — Record the Climb. This is the app's only pre-recording screen: there's no separate
-/// wall-scan step anymore, so this screen does both jobs — gate the Record button on the CURRENT
-/// camera angle having good enough depth coverage (`ARSessionManager.depthConfidenceRatio`), show
-/// move-closer/hold-steady guidance, and capture the wall reference frame
-/// (`ARSessionManager.captureWallTextureReference()`) itself, right as recording actually starts.
-/// Uses the SAME shared ARSession (via ARSessionManager.onFrameUpdate) so camera transform + depth
-/// are captured alongside the video, keyed by timestamp.
+/// Step 2 — Record the Climb. Point the camera at the wall until the angle is scanned well
+/// enough, then tap Record. Once a clip exists, this screen hands off to `PlaybackView` to review
+/// it.
 ///
-/// NOTE: this used to ALSO require panning up/down to cover the wall's vertical extent (tracking
-/// accumulated mesh height, with a real-floor-detection upgrade via
-/// `ARSessionManager.detectedFloorY`) — removed again after on-device testing showed the "tilt up
-/// to capture the top" guidance getting stuck/flickering unreliably. Only the distance check
-/// remains for now; re-adding vertical coverage later should start from a more robust signal than
-/// accumulated-mesh min/max Y.
+/// THIS FILE IS UI ONLY. It never checks depth coverage or runs the person-detection wall-save
+/// itself — it asks `RecordingEngine` (see that file) for answers, and asks `arManager`/`recorder`
+/// (both already plain, non-SwiftUI "engines" of their own) to actually run the AR session and
+/// record video. If you're redesigning this screen's look, this is the only file you should need
+/// to touch.
 struct RecordingView: View {
+    // MARK: - Given to this screen from outside
+
     @ObservedObject var arManager: ARSessionManager
     // Recorder + recorded URL are owned by ContentView (not this view) and passed in, so that
     // coming back here from Step 3 ("pick a different moment") re-shows the already-recorded
     // clip instead of losing it and dropping back to the record button.
     @ObservedObject var recorder: VideoRecorder
     @Binding var recordedURL: URL?
-    /// The session this recording was saved into (see `ContentView.createSessionIfNeeded`), and
-    /// the store to persist further changes through — both nil until the session is actually
-    /// created (right after recording stops), and nil forever if saving failed. `PlaybackView`
-    /// treats both as "annotation/markers unavailable" rather than erroring.
+    /// The session this recording was saved into, and the store to persist further changes
+    /// through — both nil until the session is actually created (right after recording stops),
+    /// and nil forever if saving failed. `PlaybackView` treats both as "annotation/markers
+    /// unavailable" rather than erroring.
     let session: RecordingSession?
     let sessionStore: SessionStore?
     let onGenerate: (URL, RecordedFrameStore, TimeInterval) -> Void
 
-    /// OFF by default — see `ARMeshSceneView.showMesh`'s doc comment. A developer toggle to check
-    /// how the mesh is holding up; normal coaches never need to see it.
-    @State private var showMesh = DeveloperSettings.showMesh
-    /// Live "is the CURRENT angle scanned well enough" cue — same signal/cadence this screen's
-    /// readiness gate uses.
-    @State private var depthQuality: Double?
-    @State private var qualityTimer: Timer?
-    /// Set the first time Record is tapped, so a coach who stops and re-starts recording within
-    /// the same screen visit doesn't re-freeze the wall reference (and its now-possibly-different
-    /// camera angle) out from under an already-recorded clip.
-    @State private var hasCapturedWallReference = false
+    // MARK: - The "brain" this screen talks to
 
-    /// Whether Record can actually be tapped right now — the CURRENT camera angle needs >= 80%
-    /// confident depth coverage before there's enough data to build a usable wall mesh from.
-    private var isReadyToRecord: Bool {
-        (depthQuality ?? 0) >= 0.8
+    /// Tracks depth-scan quality and runs the person-gated wall-mesh auto-save. Plain Swift, no
+    /// SwiftUI — see `RecordingEngine.swift`.
+    @StateObject private var engine: RecordingEngine
+
+    // MARK: - Plain on-screen state (just "what's toggled," no logic)
+
+    /// OFF by default — a developer toggle to check how the AR mesh is holding up; normal
+    /// coaches never need to see it.
+    @State private var showMesh = DeveloperSettings.showMesh
+
+    init(arManager: ARSessionManager, recorder: VideoRecorder, recordedURL: Binding<URL?>, session: RecordingSession?, sessionStore: SessionStore?, onGenerate: @escaping (URL, RecordedFrameStore, TimeInterval) -> Void) {
+        self.arManager = arManager
+        self.recorder = recorder
+        self._recordedURL = recordedURL
+        self.session = session
+        self.sessionStore = sessionStore
+        self.onGenerate = onGenerate
+        _engine = StateObject(wrappedValue: RecordingEngine(arManager: arManager, recorder: recorder))
     }
 
     var body: some View {
@@ -63,30 +64,29 @@ struct RecordingView: View {
             }
         }
         .onAppear {
-            // This is the first screen the app shows (no separate wall-scan screen anymore), so
-            // this is the only place that needs to start the ARSession —
-            // `ARSessionManager.startIfNeeded()`'s own `didConfigure` guard makes this safe to
-            // call even if something else already started it.
+            // This is the first screen the app shows (no separate wall-scan screen), so this is
+            // the only place that needs to start the ARSession — `startIfNeeded()`'s own guard
+            // makes this safe to call even if something else already started it.
             arManager.startIfNeeded()
             arManager.onFrameUpdate = { [weak recorder] frame in
                 recorder?.append(frame)
             }
-            qualityTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-                depthQuality = ARSessionManager.depthConfidenceRatio(for: arManager.latestFrame)
-            }
+            engine.start()
         }
         .onDisappear {
             arManager.onFrameUpdate = nil
-            qualityTimer?.invalidate()
-            qualityTimer = nil
+            engine.stop()
         }
     }
+
+    // MARK: - Controls: guidance text, wall-save log, record button
 
     private var controls: some View {
         VStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Point at the Wall").font(.headline)
                 readinessGuidance
+                wallSaveLog
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
@@ -96,25 +96,24 @@ struct RecordingView: View {
             Spacer()
 
             recordButton
-                .disabled(!isReadyToRecord && !recorder.isRecording)
-                .opacity((!isReadyToRecord && !recorder.isRecording) ? 0.4 : 1)
+                .disabled(!engine.isReadyToRecord && !recorder.isRecording)
+                .opacity((!engine.isReadyToRecord && !recorder.isRecording) ? 0.4 : 1)
                 .padding(.bottom, 40)
         }
     }
 
-    /// "Move closer" / "hold steady" / "ready" guidance so the coach knows whether the CURRENT
-    /// camera angle has good enough depth coverage yet, without a separate scanning step.
+    /// "Move closer" / "hold steady" / "ready" guidance, driven entirely by `engine.depthQuality`.
     @ViewBuilder
     private var readinessGuidance: some View {
-        let ratio = depthQuality ?? 0
+        let quality = engine.depthQuality ?? 0
         Group {
             if recorder.isRecording {
                 Text("Recording…")
-            } else if depthQuality == nil {
+            } else if engine.depthQuality == nil {
                 Text("Point the camera at the wall to begin")
-            } else if ratio < 0.5 {
+            } else if quality < 0.5 {
                 Text("Move closer to the wall")
-            } else if ratio < 0.8 {
+            } else if quality < RecordingEngine.readyToRecordDepthThreshold {
                 Text("Almost there — hold steady")
             } else {
                 Text("Ready — tap Record")
@@ -124,23 +123,22 @@ struct RecordingView: View {
         .foregroundStyle(.secondary)
     }
 
-    private var recordButton: some View {
-        Button {
-            if recorder.isRecording {
-                recorder.stopRecording { url in
-                    recordedURL = url
+    /// The "save mesh attempt N (no person detected)" trail, straight from `engine.wallSaveLogLines`.
+    @ViewBuilder
+    private var wallSaveLog: some View {
+        if !engine.wallSaveLogLines.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(engine.wallSaveLogLines, id: \.self) { line in
+                    Text(line)
                 }
-            } else {
-                if !hasCapturedWallReference {
-                    // The wall structure is saved AT THIS MOMENT — right as recording actually
-                    // starts, from whatever angle the coach is currently standing at. See
-                    // `hasCapturedWallReference`'s doc comment.
-                    arManager.captureWallTextureReference()
-                    hasCapturedWallReference = true
-                }
-                recorder.startRecording()
             }
-        } label: {
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var recordButton: some View {
+        Button(action: toggleRecording) {
             ZStack {
                 Circle()
                     .fill(.white)
@@ -150,6 +148,23 @@ struct RecordingView: View {
                     .frame(width: recorder.isRecording ? 30 : 62, height: recorder.isRecording ? 30 : 62)
                     .animation(.easeInOut(duration: 0.2), value: recorder.isRecording)
             }
+        }
+    }
+
+    // MARK: - Actions
+    // The function a redesigned View's Record button should call.
+
+    private func toggleRecording() {
+        if recorder.isRecording {
+            recorder.stopRecording { url in
+                recordedURL = url
+            }
+        } else {
+            // One more save attempt, same person-gated rule as the periodic auto-save, right as
+            // recording actually starts — see `RecordingEngine.attemptWallMeshSave()`'s doc
+            // comment for why this runs in ADDITION to the automatic timer, not instead of it.
+            engine.attemptWallMeshSave()
+            recorder.startRecording()
         }
     }
 }

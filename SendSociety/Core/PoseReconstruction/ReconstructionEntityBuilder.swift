@@ -23,23 +23,16 @@ enum ReconstructionEntityBuilder {
 
     // MARK: - Joint entity naming
 
-    /// Every rendered joint sphere (see `skeletonEntity` below) is named `"joint.<rawValue>"` so
-    /// `ReconstructionSceneView.Coordinator`'s Edit Pose drag gesture can hit-test `ARView.entity
-    /// (at:)`'s result back to a `BodyJointName` — this is the one place both the writer (here) and
-    /// the reader (`Coordinator.jointHit`) agree on that naming convention, so it's never duplicated
-    /// as a raw string literal in the SwiftUI-side gesture code.
+    /// Every rendered joint sphere (see `skeletonEntity` below) is named `"joint.<rawValue>"` —
+    /// purely for entity identification/debugging (e.g. inspecting the scene graph). Edit Pose's
+    /// joint hit-testing (`ReconstructionSceneView.Coordinator.jointWithinRadius`) works off
+    /// `currentPositions`' world coordinates directly (screen-projected radius check) rather than
+    /// `ARView.entity(at:)` + this naming convention, since a fixed-visual-size entity hit test
+    /// can't express "hit zone bigger than what's actually drawn."
     private static let jointEntityNamePrefix = "joint."
 
     private static func jointEntityName(for joint: BodyJointName) -> String {
         jointEntityNamePrefix + joint.rawValue
-    }
-
-    /// Parses an `Entity.name` produced by `jointEntityName(for:)` back into a `BodyJointName` —
-    /// nil for any entity that isn't a joint sphere (the wall, bones, etc. all have different
-    /// names).
-    static func jointName(fromEntityName entityName: String) -> BodyJointName? {
-        guard entityName.hasPrefix(jointEntityNamePrefix) else { return nil }
-        return BodyJointName(rawValue: String(entityName.dropFirst(jointEntityNamePrefix.count)))
     }
 
     // MARK: - Wall mesh
@@ -469,15 +462,19 @@ enum ReconstructionEntityBuilder {
     /// `skeletonEntity`) so callers — e.g. ReconstructionView's camera-framing code — can use the
     /// same positions without recomputing them.
     ///
-    /// When `depthContext` is available (the recorded frame had real LiDAR depth), every joint
-    /// that CAN be grounded in that real depth is, via `BodyPose3DExtractor.groundJointsBestEffort`
-    /// — this is what fixes both the climber-height accuracy and the skeleton-vs-wall placement
-    /// (the wall mesh is built from the SAME depth data, so grounding the skeleton in it puts both
-    /// in a consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
-    /// depth guess). Only the specific joint(s) that fail to ground (e.g. an occluded hand) fall
-    /// back to Vision's own estimate — see `groundJointsBestEffort`'s doc comment for why an
-    /// all-or-nothing per-frame result would be worse. Falls back to the ungrounded, Vision-only
-    /// estimate for every joint only when there's no depth data for this frame at all.
+    /// When `depthContext` is available (the recorded frame had real LiDAR depth), the WHOLE
+    /// skeleton is grounded via a single trusted anchor — the hip/root joint — through
+    /// `BodyPose3DExtractor.groundSkeletonRootAnchored`: the hip's real LiDAR depth vs. Vision's
+    /// own depth guess for the hip gives a scale factor, and every other joint's Vision-estimated
+    /// offset from the hip is scaled by that SAME factor, uniformly in all three axes. This is
+    /// what fixes both the climber-height accuracy and the skeleton-vs-wall placement (the wall
+    /// mesh is built from the SAME depth data, so grounding the skeleton in it puts both in a
+    /// consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
+    /// depth guess) — see that function's doc comment for why this replaced an earlier version
+    /// that grounded every joint independently (it couldn't guarantee bone lengths stayed
+    /// physically plausible). Falls back to the ungrounded, Vision-only estimate for every joint
+    /// when there's no depth data for this frame at all, OR when the hip's own LiDAR reading fails
+    /// its sanity check.
     ///
     /// `wallReference`, when available, is used as a final sanity pass (`keepInFrontOfWall`) —
     /// the wall's point-cloud mesh and the skeleton are grounded from DIFFERENT frames (Step 1's
@@ -503,21 +500,18 @@ enum ReconstructionEntityBuilder {
             return keepInFrontOfWall(worldPositions, wallReference: wallReference)
         }
 
-        // Best-effort, not all-or-nothing: keep real LiDAR grounding for every joint that succeeds,
-        // and only fall back to Vision's own (less accurate) estimate for whichever SPECIFIC
-        // joint(s) fail — see `groundJointsBestEffort`'s doc comment for why throwing away every
-        // other joint's real depth over one bad reading (e.g. a hand's confidence-dropout search
-        // grabbing the wall behind it) was making the WHOLE skeleton visibly worse than necessary.
-        let (grounded, ungroundedJoints) = BodyPose3DExtractor.groundJointsBestEffort(
+        // Ground the hip in real LiDAR depth, then scale every other joint's Vision-estimated
+        // offset from the hip by that same factor — see `groundSkeletonRootAnchored`'s doc comment
+        // for why this replaced independently grounding all 17 joints.
+        let (grounded, isRootGrounded) = BodyPose3DExtractor.groundSkeletonRootAnchored(
             sample.rootRelativePositions,
             cameraOriginMatrix: sample.cameraOriginMatrix,
             context: depthContext
         )
-        if ungroundedJoints.isEmpty {
-            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (17/17 joints)")
+        if isRootGrounded {
+            DebugLog.reconstruction.info("Step 4 skeleton placed using root-anchored LiDAR scale (hip grounded, \(grounded.count, privacy: .public) joints scaled to match)")
         } else {
-            let resolved = sample.rootRelativePositions.count - ungroundedJoints.count
-            DebugLog.reconstruction.info("Step 4 skeleton placed using LiDAR-grounded joint depth (\(resolved)/\(sample.rootRelativePositions.count) joints — the rest used Vision-only, see prior warning for which)")
+            DebugLog.reconstruction.info("Step 4 skeleton placed using Vision-only estimate (hip LiDAR grounding unavailable or failed its sanity check)")
         }
         var worldPositions: [BodyJointName: SIMD3<Float>] = [:]
         for (joint, cameraSpace) in grounded {
@@ -621,7 +615,7 @@ enum ReconstructionEntityBuilder {
         if !hideMannequinBody {
             for bone in skeletonBones {
                 guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
-                if let capsule = capsuleBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
+                if let capsule = cylinderBetween(a, b, radius: mannequinRadius(for: bone), material: mannequinMaterial) {
                     root.addChild(capsule)
                 }
             }
@@ -705,32 +699,15 @@ enum ReconstructionEntityBuilder {
         return maxRadius
     }
 
-    /// Mannequin limb segment: same rotate-a-cylinder-onto-a-direction trick as `cylinderBetween`
-    /// (in fact identical geometry — `MeshResource.generateCapsule` doesn't exist on this
-    /// RealityKit version, confirmed by a real build error, so this is a plain cylinder). The
-    /// rounded-off look comes from `skeletonEntity` also dropping a sphere at every joint (see
-    /// `mannequinJointRadius`) sized to match the thickest connected limb, which covers the flat
-    /// cylinder end caps instead of leaving visible seams at the joints.
-    private static func capsuleBetween(_ a: SIMD3<Float>, _ b: SIMD3<Float>, radius: Float, material: Material) -> Entity? {
-        let distance = simd_distance(a, b)
-        guard distance > 0.001 else { return nil }
-        let mesh = MeshResource.generateCylinder(height: distance, radius: radius)
-        let entity = ModelEntity(mesh: mesh, materials: [material])
-        entity.position = (a + b) / 2
-
-        let direction = normalize(b - a)
-        let up = SIMD3<Float>(0, 1, 0)
-        let dot = simd_dot(up, direction)
-        if dot < -0.9999 {
-            entity.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
-        } else if dot < 0.9999 {
-            let axis = normalize(simd_cross(up, direction))
-            let angle = acos(dot)
-            entity.orientation = simd_quatf(angle: angle, axis: axis)
-        }
-        return entity
-    }
-
+    /// Builds a cylinder mesh stretching from `a` to `b` and rotates it to point the right way —
+    /// used for BOTH the thin red skeleton bones AND the thicker tan mannequin limb "capsules"
+    /// (there's no real capsule mesh here: `MeshResource.generateCapsule` doesn't exist on this
+    /// RealityKit version, confirmed by a real build error, so a plain cylinder stands in for one
+    /// in both places — they used to be two separate, identical copies of this same function).
+    /// For the mannequin case, the rounded-off look comes from `skeletonEntity` also dropping a
+    /// sphere at every joint (see `mannequinJointRadius`) sized to match the thickest connected
+    /// limb, which covers the flat cylinder end caps instead of leaving visible seams at the
+    /// joints.
     private static func cylinderBetween(_ a: SIMD3<Float>, _ b: SIMD3<Float>, radius: Float, material: Material) -> Entity? {
         let distance = simd_distance(a, b)
         guard distance > 0.001 else { return nil }
