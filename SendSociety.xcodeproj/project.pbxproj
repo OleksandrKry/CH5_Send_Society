@@ -30,6 +30,23 @@
 		6851B765302F50A500940510 /* RecordingViewV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B764302F509F00940510 /* RecordingViewV2.swift */; };
 		6851B767302F5F5000940510 /* RecordingSessionV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B766302F5F4C00940510 /* RecordingSessionV2.swift */; };
 		6851B769302F5FC100940510 /* VideoAttemptV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B768302F5FBD00940510 /* VideoAttemptV2.swift */; };
+		6851B777302F660700940510 /* SessionStoreV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B776302F65F400940510 /* SessionStoreV2.swift */; };
+		6851B77A30303A1500940510 /* PlaybackLayerV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B779303039FD00940510 /* PlaybackLayerV2.swift */; };
+		6851B77D30304F9300940510 /* RecordingThumbnail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B77C30304F8600940510 /* RecordingThumbnail.swift */; };
+		6851B77F3030576A00940510 /* Generate3DEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B77E3030575F00940510 /* Generate3DEngine.swift */; };
+		6851B78130305BFE00940510 /* Video3DLidarModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78030305BC800940510 /* Video3DLidarModel.swift */; };
+		6851B7833030792100940510 /* Video3DLidarGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7823030791600940510 /* Video3DLidarGenerator.swift */; };
+		6851B785303089FE00940510 /* Skeleton3DView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B784303089DA00940510 /* Skeleton3DView.swift */; };
+		6851B78730308A7F00940510 /* AppleVisionSkeleton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78630308A7900940510 /* AppleVisionSkeleton.swift */; };
+		6851B78930308B4600940510 /* Skeleton3DSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78830308B3A00940510 /* Skeleton3DSceneView.swift */; };
+		6851B78B30308CAB00940510 /* Video3DRealityKit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78A30308C8800940510 /* Video3DRealityKit.swift */; };
+		6851B78D3030C76D00940510 /* ARFrameData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78C3030C75F00940510 /* ARFrameData.swift */; };
+		6851B78F3030C87400940510 /* VideoRecorderEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B78E3030C86900940510 /* VideoRecorderEngine.swift */; };
+		6851B7913030C90400940510 /* RecordingEngineV2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7903030C90300940510 /* RecordingEngineV2.swift */; };
+		6851B7933031D53F00940510 /* LibraryRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7923031D53B00940510 /* LibraryRow.swift */; };
+		6851B7953031D58200940510 /* OfflinePlaybackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7943031D57800940510 /* OfflinePlaybackView.swift */; };
+		6851B7973031D87500940510 /* AppleVisionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7963031D87000940510 /* AppleVisionEstimator.swift */; };
+		6851B7993031D97E00940510 /* OfflinePlaybackLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7983031D97300940510 /* OfflinePlaybackLayer.swift */; };
 		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
 		7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */; };
 		742943CDD3FF99A0EEC7D4CB /* ReconstructionSceneView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */; };
@@ -82,6 +99,23 @@
 		6851B764302F509F00940510 /* RecordingViewV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingViewV2.swift; sourceTree = "<group>"; };
 		6851B766302F5F4C00940510 /* RecordingSessionV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingSessionV2.swift; sourceTree = "<group>"; };
 		6851B768302F5FBD00940510 /* VideoAttemptV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAttemptV2.swift; sourceTree = "<group>"; };
+		6851B776302F65F400940510 /* SessionStoreV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStoreV2.swift; sourceTree = "<group>"; };
+		6851B779303039FD00940510 /* PlaybackLayerV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackLayerV2.swift; sourceTree = "<group>"; };
+		6851B77C30304F8600940510 /* RecordingThumbnail.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingThumbnail.swift; sourceTree = "<group>"; };
+		6851B77E3030575F00940510 /* Generate3DEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Generate3DEngine.swift; sourceTree = "<group>"; };
+		6851B78030305BC800940510 /* Video3DLidarModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video3DLidarModel.swift; sourceTree = "<group>"; };
+		6851B7823030791600940510 /* Video3DLidarGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video3DLidarGenerator.swift; sourceTree = "<group>"; };
+		6851B784303089DA00940510 /* Skeleton3DView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Skeleton3DView.swift; sourceTree = "<group>"; };
+		6851B78630308A7900940510 /* AppleVisionSkeleton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleVisionSkeleton.swift; sourceTree = "<group>"; };
+		6851B78830308B3A00940510 /* Skeleton3DSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Skeleton3DSceneView.swift; sourceTree = "<group>"; };
+		6851B78A30308C8800940510 /* Video3DRealityKit.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Video3DRealityKit.swift; sourceTree = "<group>"; };
+		6851B78C3030C75F00940510 /* ARFrameData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARFrameData.swift; sourceTree = "<group>"; };
+		6851B78E3030C86900940510 /* VideoRecorderEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorderEngine.swift; sourceTree = "<group>"; };
+		6851B7903030C90300940510 /* RecordingEngineV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingEngineV2.swift; sourceTree = "<group>"; };
+		6851B7923031D53B00940510 /* LibraryRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryRow.swift; sourceTree = "<group>"; };
+		6851B7943031D57800940510 /* OfflinePlaybackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePlaybackView.swift; sourceTree = "<group>"; };
+		6851B7963031D87000940510 /* AppleVisionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleVisionEstimator.swift; sourceTree = "<group>"; };
+		6851B7983031D97300940510 /* OfflinePlaybackLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePlaybackLayer.swift; sourceTree = "<group>"; };
 		6ABBDD6AA8EB4CDC899C911C /* VideoRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoRecorder.swift; sourceTree = "<group>"; };
 		7A2EACC8906161F57BB8245E /* LibraryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEngine.swift; sourceTree = "<group>"; };
 		842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReconstructionView.swift; sourceTree = "<group>"; };
@@ -142,6 +176,7 @@
 		26F50DCE09913BC0078E5F09 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				6851B78830308B3A00940510 /* Skeleton3DSceneView.swift */,
 				D775BD68B7A8AAC94FA56ED4 /* ReconstructionSceneView.swift */,
 			);
 			path = Components;
@@ -150,6 +185,8 @@
 		277A11A435994C7C21BE7A93 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7983031D97300940510 /* OfflinePlaybackLayer.swift */,
+				6851B7943031D57800940510 /* OfflinePlaybackView.swift */,
 				CDC3371247FC4A41A1F41C0F /* LibraryView.swift */,
 				7A2EACC8906161F57BB8245E /* LibraryEngine.swift */,
 				173F8B544A2F4453ADEBED6D /* SessionReviewView.swift */,
@@ -174,6 +211,8 @@
 		358F98F5A91CBC675D091BA1 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				6851B784303089DA00940510 /* Skeleton3DView.swift */,
+				6851B77E3030575F00940510 /* Generate3DEngine.swift */,
 				842B5FB679EF4DDFBB02B095 /* ReconstructionView.swift */,
 				ADEEADC9E849C7964C57688C /* ReconstructionHostEngine.swift */,
 			);
@@ -183,6 +222,7 @@
 		3D3A1233D446F50B37DDB448 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7923031D53B00940510 /* LibraryRow.swift */,
 				0095405D8132C3FB2A4531F2 /* SessionRow.swift */,
 			);
 			path = Components;
@@ -205,6 +245,22 @@
 			name = "Recovered References";
 			sourceTree = "<group>";
 		};
+		6851B774302F656600940510 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				6851B776302F65F400940510 /* SessionStoreV2.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		6851B77B30304AEF00940510 /* RecordingComponent */ = {
+			isa = PBXGroup;
+			children = (
+				6851B77C30304F8600940510 /* RecordingThumbnail.swift */,
+			);
+			path = RecordingComponent;
+			sourceTree = "<group>";
+		};
 		832A34B5D1194C9A8D3DDB9D /* Recording */ = {
 			isa = PBXGroup;
 			children = (
@@ -216,6 +272,7 @@
 		84F89BFA6AC94AB09ECF5216 /* ModelDB */ = {
 			isa = PBXGroup;
 			children = (
+				6851B78030305BC800940510 /* Video3DLidarModel.swift */,
 				6851B768302F5FBD00940510 /* VideoAttemptV2.swift */,
 				6851B766302F5F4C00940510 /* RecordingSessionV2.swift */,
 				42BF999F98834402830605C8 /* EnumModels.swift */,
@@ -233,6 +290,8 @@
 		8F58071BC38A4B6DB9D8008A /* Capture */ = {
 			isa = PBXGroup;
 			children = (
+				6851B78E3030C86900940510 /* VideoRecorderEngine.swift */,
+				6851B78C3030C75F00940510 /* ARFrameData.swift */,
 				11847F3954984489906204D4 /* ARSessionManager.swift */,
 				B2FE61DE8DE646B691B6F5AB /* RecordedFrameStore.swift */,
 				230F572E3FAC418F97998530 /* PixelBufferCopy.swift */,
@@ -255,6 +314,10 @@
 		9C3D9E1AAF5B4E2A9C0F7B31 /* PoseReconstruction */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7963031D87000940510 /* AppleVisionEstimator.swift */,
+				6851B78A30308C8800940510 /* Video3DRealityKit.swift */,
+				6851B78630308A7900940510 /* AppleVisionSkeleton.swift */,
+				6851B7823030791600940510 /* Video3DLidarGenerator.swift */,
 				4829A65193DF4980844113C6 /* BodyPose3DExtractor.swift */,
 				FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */,
 				F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */,
@@ -286,6 +349,7 @@
 		D58979A097D144C2A7F9AB24 /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				6851B774302F656600940510 /* Persistence */,
 				D861829D58114A9AADE83B96 /* DebugLog.swift */,
 				D5D86334302B42F0ADDD357A /* DeveloperSettings.swift */,
 				BF324A61D6564EBD9F31224A /* LiDARSupport.swift */,
@@ -300,6 +364,9 @@
 		D85CCAB55A88FB7D404872C9 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7903030C90300940510 /* RecordingEngineV2.swift */,
+				6851B77B30304AEF00940510 /* RecordingComponent */,
+				6851B779303039FD00940510 /* PlaybackLayerV2.swift */,
 				6851B764302F509F00940510 /* RecordingViewV2.swift */,
 				6851B74B302EE59D00940510 /* PlaybackComponent */,
 				6851B749302EE57400940510 /* PlaybackViewV2.swift */,
@@ -415,18 +482,26 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6851B78D3030C76D00940510 /* ARFrameData.swift in Sources */,
+				6851B78B30308CAB00940510 /* Video3DRealityKit.swift in Sources */,
 				05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */,
 				6851B759302F18F800940510 /* AnnotationStrokeModel.swift in Sources */,
 				BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */,
+				6851B77D30304F9300940510 /* RecordingThumbnail.swift in Sources */,
+				6851B77A30303A1500940510 /* PlaybackLayerV2.swift in Sources */,
 				F116F1DB318D4597A8E744B2 /* BodyPose3DExtractor.swift in Sources */,
 				5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */,
+				6851B78930308B4600940510 /* Skeleton3DSceneView.swift in Sources */,
+				6851B77F3030576A00940510 /* Generate3DEngine.swift in Sources */,
 				5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */,
 				668D2FDE36D8430C9E10EED4 /* DeveloperSettings.swift in Sources */,
 				6851B75B302F34AA00940510 /* VideoMarkerModel.swift in Sources */,
+				6851B7913030C90400940510 /* RecordingEngineV2.swift in Sources */,
 				66C88F3E087B464E87388EB7 /* LiDARSupport.swift in Sources */,
 				D96EA0DEEE064E5AA1092966 /* EnumModels.swift in Sources */,
 				66CE1EA398DC4E5AA29D3BEC /* RecordedFrameStore.swift in Sources */,
 				D5FD368E50CF49F0BFBDA362 /* PixelBufferCopy.swift in Sources */,
+				6851B777302F660700940510 /* SessionStoreV2.swift in Sources */,
 				9EE5D285525941919F95D9DF /* ReconstructionEntityBuilder.swift in Sources */,
 				2053C29112DB86A8B7F5CA7C /* ReconstructionEstimator.swift in Sources */,
 				8630887AA8244FE44D082985 /* LiveReconstructionGenerator.swift in Sources */,
@@ -439,22 +514,31 @@
 				18D235F2DD5FE6F2CA7739D8 /* PlaybackEngine.swift in Sources */,
 				384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */,
 				D3373B559DA7FDC2CCE1AF39 /* SkeletonImageOverlayView.swift in Sources */,
+				6851B7973031D87500940510 /* AppleVisionEstimator.swift in Sources */,
+				6851B78F3030C87400940510 /* VideoRecorderEngine.swift in Sources */,
 				1AF2E6FE5DA945E69BF5FCB4 /* RecordingView.swift in Sources */,
 				378B628210BC84C2FE096DF0 /* RecordingEngine.swift in Sources */,
+				6851B785303089FE00940510 /* Skeleton3DView.swift in Sources */,
 				7375FB174C934FE8A2FC006B /* VideoRecorder.swift in Sources */,
+				6851B7833030792100940510 /* Video3DLidarGenerator.swift in Sources */,
 				9B1B8797B9AB48D784BAD1CB /* ARMeshSceneView.swift in Sources */,
 				EBDE42897A9A40BAAC39292C /* MeshToggleButton.swift in Sources */,
+				6851B78730308A7F00940510 /* AppleVisionSkeleton.swift in Sources */,
 				9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */,
 				6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */,
+				6851B7933031D53F00940510 /* LibraryRow.swift in Sources */,
 				53EF1FB52F5DEE47476AC704 /* AnnotationComponent.swift in Sources */,
 				4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */,
+				6851B78130305BFE00940510 /* Video3DLidarModel.swift in Sources */,
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
 				1A5B393845494E32BFE2894E /* RecordingSession.swift in Sources */,
+				6851B7953031D58200940510 /* OfflinePlaybackView.swift in Sources */,
 				C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */,
 				F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */,
 				6851B767302F5F5000940510 /* RecordingSessionV2.swift in Sources */,
 				A1BF080EEEA84AC7B780D573 /* SessionStore.swift in Sources */,
 				CBBB70CAFB0843AEA722A6CA /* SessionReviewView.swift in Sources */,
+				6851B7993031D97E00940510 /* OfflinePlaybackLayer.swift in Sources */,
 				258F62494496BAB5F5CA9C67 /* SessionReviewEngine.swift in Sources */,
 				84413822E37CD7F0C740DFB0 /* SavedReconstructionReviewView.swift in Sources */,
 				2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */,

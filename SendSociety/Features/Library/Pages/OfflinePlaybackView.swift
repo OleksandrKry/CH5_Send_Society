@@ -1,23 +1,23 @@
 //
-//  PlaybackViewV2.swift
+//  OfflinePlaybackView.swift
 //  SendSociety
 //
-//  Created by Christofer Theodore on 14/08/26.
+//  Created by Christofer Theodore on 16/08/26.
 //
+
 
 import SwiftUI
 import AVKit
 
-struct PlaybackViewV2: View {
+struct OfflinePlaybackView: View {
     
     // Theo start merge
     // MARK: - Given to this screen from outside
 
     let videoURL: URL
-    let frameStore: ARFrameStore
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
-    let onGenerate: (URL, ARFrameStore, TimeInterval) -> Void
+    let onGenerate: (URL, TimeInterval) -> Void
     let onDismiss: (() -> Void)?
     
     let onVideoAnnotationsChanged: ((Double, [AnnotationStrokeModel]) -> Void)?
@@ -46,7 +46,6 @@ struct PlaybackViewV2: View {
 
     init(
         url: URL,
-        frameStore: ARFrameStore,
         recordingSession: RecordingSessionV2?,
         sessionController: SessionStoreV2?,
         initialVideoAnnotations: [VideoAnnotationEntry] = [],
@@ -54,10 +53,9 @@ struct PlaybackViewV2: View {
         initialPlaybackTimestamp: Double? = nil,
         onDismiss: (() -> Void)? = nil,
         onVideoAnnotationsChanged: ((Double, [AnnotationStrokeModel]) -> Void)? = nil,
-        onGenerate: @escaping (URL, ARFrameStore, TimeInterval) -> Void
+        onGenerate: @escaping (URL, TimeInterval) -> Void
     ) {
         self.videoURL = url
-        self.frameStore = frameStore
         self.recordingSession = recordingSession
         self.sessionController = sessionController
         self.onDismiss = onDismiss
@@ -104,7 +102,7 @@ struct PlaybackViewV2: View {
         lastKnownSavedStrokes = loaded
         annotationState.load(strokes: loaded)
         if videoMarkerModel.has3DPose {
-            onGenerate(videoURL, frameStore, videoMarkerModel.videoTimeInSeconds)
+            onGenerate(videoURL, videoMarkerModel.videoTimeInSeconds)
         }
     }
     
@@ -138,7 +136,7 @@ struct PlaybackViewV2: View {
                        playbackRate: $playbackRate,
                         videoMarkerList: getVideoMarkerList,
                         onVideoMarkerClick: goToVideoMarker,
-                        onGenerate3D: { onGenerate(videoURL, frameStore, videoModel.currentTime) }
+                        onGenerate3D: { onGenerate(videoURL, videoModel.currentTime) }
                    )
             }
             
@@ -216,10 +214,9 @@ struct PlaybackViewV2: View {
 }
 
 #Preview {
-    PlaybackViewV2(
+    OfflinePlaybackView(
         url: FileManager.default.temporaryDirectory.appendingPathComponent("preview.mp4"),
-        frameStore: ARFrameStore(),
         recordingSession: nil,
         sessionController: nil
-    ) { _, _, _ in }
+    ) { _, _ in }
 }

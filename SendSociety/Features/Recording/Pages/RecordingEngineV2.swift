@@ -1,7 +1,14 @@
+//
+//  Untitled.swift
+//  SendSociety
+//
+//  Created by Christofer Theodore on 16/08/26.
+//
+
 import Foundation
 import UIKit
 
-final class RecordingEngine: ObservableObject {
+final class RecordingEngineV2: ObservableObject {
     /// How often the current camera angle's depth coverage is checked.
     static let depthCheckIntervalSeconds: TimeInterval = 0.5
     /// How often the wall reference is re-saved while the angle is ready and not yet recording.
@@ -29,7 +36,7 @@ final class RecordingEngine: ObservableObject {
     private var relocalizationDeadline: Date?
 
     private let arManager: ARSessionManager
-    private let recorder: VideoRecorder
+    private let recorder: VideoRecorderEngine
 
     private var depthCheckTimer: Timer?
     private var wallSaveTimer: Timer?
@@ -38,8 +45,21 @@ final class RecordingEngine: ObservableObject {
     private var isWallSaveCheckRunning = false
     /// Counts only SUCCESSFUL saves — what the numbers in `wallSaveLogLines` count up from.
     private var successfulWallSaveCount = 0
+    
+    /// True once the coach has started recording at least once this session. The wall/mesh
+    /// reference should only ever be (re-)captured BEFORE this happens — every recording after the
+    /// first must reconstruct against the exact same wall scan the FIRST recording used, not
+    /// whatever the camera happens to be pointed at between takes.
+    @Published private(set) var hasRecordedAtLeastOnce = false
 
-    init(arManager: ARSessionManager, recorder: VideoRecorder) {
+    /// Call once, right when the coach starts recording for the first time this session — locks in
+    /// the wall reference for every recording from here on. Harmless to call again on every later
+    /// recording too; it only ever moves one way, false -> true.
+    func markRecordingStarted() {
+        hasRecordedAtLeastOnce = true
+    }
+
+    init(arManager: ARSessionManager, recorder: VideoRecorderEngine) {
         self.arManager = arManager
         self.recorder = recorder
     }
@@ -99,7 +119,7 @@ final class RecordingEngine: ObservableObject {
     /// two trigger points, so the freshest possible person-free wall reference is always what
     /// actually gets used.
     func attemptWallMeshSave() {
-        guard !isWallSaveCheckRunning, let pixelBuffer = arManager.latestFrame?.capturedImage else { return }
+        guard !hasRecordedAtLeastOnce, !isWallSaveCheckRunning, let pixelBuffer = arManager.latestFrame?.capturedImage else { return }
         isWallSaveCheckRunning = true
         let deviceOrientation = UIDevice.current.orientation
         PersonPresenceDetector.detectsPerson(in: pixelBuffer, deviceOrientation: deviceOrientation) { [weak self] personIsPresent in

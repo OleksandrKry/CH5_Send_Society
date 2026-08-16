@@ -3,21 +3,6 @@ import Combine
 import simd
 import UIKit
 
-/// CAPTURE MODULE: everything in `Core/Capture/` is about getting real-world data IN — the live
-/// ARSession, camera frames, depth, and the recorded video file. Nothing in this folder knows
-/// about Vision body-pose detection or RealityKit rendering (that's
-/// `Core/Reconstruction/`) or how a session gets saved to disk (that's `Core/Persistence/`).
-/// `ARSessionManager` is this module's main entry point — most other modules only ever need it
-/// (and its `WallTextureReference`) or `VideoRecorder`/`RecordedFrameStore`, not the smaller
-/// helper files.
-///
-/// Owns the single, continuously-running ARSession shared across Steps 1-3.
-///
-/// CRITICAL: per the build brief, the wall scan and the recording MUST share one ARSession
-/// instance. Restarting the session between steps forces ARKit to relocalize, and the wall's
-/// coordinate space can drift out of alignment with the body's coordinate space — this MVP has
-/// no fallback for that. `startIfNeeded()` is guarded so the session can only ever be started
-/// once per app launch.
 final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
 
     /// A single color frame + the camera pose/intrinsics it was captured with, kept around so
@@ -71,6 +56,7 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
     var onFrameUpdate: ((ARFrame) -> Void)?
 
     private var didConfigure = false
+    private var arWorldTrackConfig: ARWorldTrackingConfiguration?
 
     override init() {
         super.init()
@@ -94,10 +80,31 @@ final class ARSessionManager: NSObject, ObservableObject, ARSessionDelegate {
         // "poor slam" tracking degradation and crash during recording (a large, relatively
         // low-texture climbing wall is already a hard scene for visual tracking on its own; no
         // reason to also make ARKit hunt for planes in it).
-
+        self.arWorldTrackConfig = configuration
         session.run(configuration)
         isRunning = true
         DebugLog.general.info("ARSession started — one continuous session shared across Steps 1-3")
+    }
+    /// Pauses the session WITHOUT tearing it down — `session` stays the same object, so the
+    /// coordinate space isn't lost, only frame delivery stops. Safe whenever you don't need live
+    /// camera/depth for a while (e.g. right after a recording ends).
+    func pause() {
+        guard isRunning else { return }
+        session.pause()
+        isRunning = false
+        DebugLog.general.info("ARSession paused")
+    }
+
+    /// Resumes a paused session. Passes NO options (never `.resetTracking`) — this tells ARKit to
+    /// try to relocalize back into the SAME coordinate space it had before pausing, the same
+    /// mechanism it already uses after a system interruption (see `sessionInterruptionEnded`
+    /// below). Not guaranteed to succeed — `trackingQuality` is how a caller finds out.
+    func resume() {
+        guard !isRunning, let arWorldTrackConfig else { return }
+        trackingQuality = .relocalizing
+        session.run(arWorldTrackConfig, options: [])
+        isRunning = true
+        DebugLog.general.info("ARSession resumed — relocalizing")
     }
 
     /// Snapshots the current frame's color image + camera pose/intrinsics as the reference used

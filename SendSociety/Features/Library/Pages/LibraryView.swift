@@ -1,37 +1,37 @@
 import SwiftUI
 import SwiftData
 
-/// The app's default landing page — a chronological list of every recorded session, each showing
-/// whether it has saved 3D reconstructions to revisit, with a "New Recording" entry point into
-/// the existing 4-step capture pipeline (`ContentView`).
+/// The app's default landing page — a chronological list of every recorded VIDEO ATTEMPT across
+/// every session (flattened, most-recently-recorded first), each showing whether it has saved 3D
+/// reconstructions to revisit, with a "New Recording" entry point into the capture pipeline.
 ///
 /// NAVIGATION SHAPE: this is the app's actual root (see `SendSocietyApp`). `ContentView` (the
-/// Steps 1-4 pipeline) and `SessionReviewView` (revisiting a saved session) are both presented
+/// recording pipeline) and `OfflinePlaybackLayer` (revisiting a saved video) are both presented
 /// full-screen FROM here and always return back here when done.
 ///
-/// THIS FILE IS UI ONLY. It never talks to `SessionStore` directly for loading/filtering/deleting
-/// — it asks `LibraryEngine` (see that file) to do it. If you're redesigning this screen's look,
-/// this is the only file you should need to touch.
+/// THIS FILE IS UI ONLY. It never talks to `SessionStoreV2` directly for loading/filtering/
+/// deleting — it asks `LibraryEngine` to do it. If you're redesigning this screen's look, this is
+/// the only file you should need to touch.
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
 
     // MARK: - Plain on-screen state
 
-    @State private var sessionStore: SessionStore?
-    @State private var sessions: [RecordingSession] = []
+    @State private var sessionController: SessionStoreV2?
+    @State private var items: [LibraryEngine.Item] = []
     @State private var isPresentingNewRecording = false
-    @State private var reviewingSession: RecordingSession?
+    @State private var reviewingItem: LibraryEngine.Item?
     @State private var searchText = ""
 
-    /// The "brain" for this screen — built fresh from `sessionStore` since it holds no state of
-    /// its own. nil until `sessionStore` exists (see `setUpIfNeeded()`).
+    /// The "brain" for this screen — built fresh from `sessionController` since it holds no state
+    /// of its own. nil until `sessionController` exists (see `setUpIfNeeded()`).
     private var engine: LibraryEngine? {
-        sessionStore.map { LibraryEngine(sessionStore: $0) }
+        sessionController.map { LibraryEngine(sessionStore: $0) }
     }
 
-    /// `sessions`, narrowed down by whatever's typed into the search field.
-    private var filteredSessions: [RecordingSession] {
-        engine?.sessions(sessions, matching: searchText) ?? []
+    /// `items`, narrowed down by whatever's typed into the search field.
+    private var filteredItems: [LibraryEngine.Item] {
+        engine?.items(items, matching: searchText) ?? []
     }
 
     var body: some View {
@@ -39,10 +39,10 @@ struct LibraryView: View {
             Group {
                 if !LiDARSupport.isSupported {
                     unsupportedDeviceView
-                } else if sessions.isEmpty {
+                } else if items.isEmpty {
                     emptyStateView
                 } else {
-                    sessionList
+                    itemList
                 }
             }
             .navigationTitle("Send Society")
@@ -58,32 +58,36 @@ struct LibraryView: View {
         }
         .searchable(text: $searchText, prompt: "Search recordings")
         .onAppear(perform: setUpIfNeeded)
-        .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: reloadSessions) {
+        .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: reloadItems) {
             ContentView(onFinished: {
                 isPresentingNewRecording = false
-                reloadSessions()
+                reloadItems()
             })
         }
-        .fullScreenCover(item: $reviewingSession, onDismiss: reloadSessions) { session in
-            if let sessionStore {
-                SessionReviewView(session: session, sessionStore: sessionStore, onClose: {
-                    reviewingSession = nil
-                })
+        .fullScreenCover(item: $reviewingItem, onDismiss: reloadItems) { item in
+            if let sessionController {
+                OfflinePlaybackLayer(
+                    videoURL: sessionController.videoURL(for: item.videoAttempt),
+                    videoAttempt: item.videoAttempt,
+                    recordingSession: item.session,
+                    sessionController: sessionController,
+                    onDismiss: { reviewingItem = nil }
+                )
             }
         }
     }
 
-    private var sessionList: some View {
+    private var itemList: some View {
         List {
-            ForEach(filteredSessions) { session in
+            ForEach(filteredItems) { item in
                 Button {
-                    reviewingSession = session
+                    reviewingItem = item
                 } label: {
-                    SessionRow(session: session)
+                    LibraryRow(item: item)
                 }
                 .buttonStyle(.plain)
             }
-            .onDelete(perform: deleteSessions)
+            .onDelete(perform: deleteItems)
         }
         .listStyle(.plain)
     }
@@ -129,54 +133,49 @@ struct LibraryView: View {
     }
 
     // MARK: - Actions
-    // Functions a redesigned View's buttons/lifecycle hooks should call.
 
-    /// Creates the `SessionStore` (needs `modelContext` from the environment, so it can't be
+    /// Creates the `SessionStoreV2` (needs `modelContext` from the environment, so it can't be
     /// built any earlier than this) the first time this screen appears, then loads the list.
     private func setUpIfNeeded() {
-        guard sessionStore == nil else { return }
-        sessionStore = SessionStore(modelContext: modelContext)
-        reloadSessions()
+        guard sessionController == nil else { return }
+        sessionController = SessionStoreV2(modelContext: modelContext)
+        reloadItems()
     }
 
-    /// Re-reads every saved session from disk. Call after anything that could have changed the
-    /// list — finishing a new recording, returning from a review screen, deleting a row.
-    private func reloadSessions() {
-        sessions = engine?.loadAllSessions() ?? []
+    /// Re-reads every saved session's video attempts from disk and re-flattens/re-sorts them.
+    /// Call after anything that could have changed the list — finishing a new recording,
+    /// returning from a review screen, deleting a row.
+    private func reloadItems() {
+        items = engine?.loadAllVideoAttempts() ?? []
     }
 
-    private func deleteSessions(at offsets: IndexSet) {
+    private func deleteItems(at offsets: IndexSet) {
         guard let engine else { return }
         for index in offsets {
-            engine.deleteSession(filteredSessions[index])
+            engine.delete(filteredItems[index])
         }
-        reloadSessions()
+        reloadItems()
     }
 }
 
-// `SessionRow` (one row in the library list) lives in
-// Features/Library/Components/SessionRow.swift — a reusable rendering primitive, not page logic,
-// so it lives separately for a frontend developer to find and edit on its own.
+// `LibraryRow` (one row in the library list) lives in
+// Features/Library/Components/LibraryRow.swift.
 
-// Preview note: an in-memory, throwaway SwiftData store — nothing here touches the real on-device
-// database. Shows the empty state (no sessions yet); see `#Preview("With sessions")` below for the
-// populated list layout.
 #Preview {
     LibraryView()
-        .modelContainer(for: RecordingSession.self, inMemory: true)
+        .modelContainer(for: RecordingSessionV2.self, inMemory: true)
 }
 
 #Preview("With sessions") {
-    let container = try! ModelContainer(for: RecordingSession.self, configurations: .init(isStoredInMemoryOnly: true))
+    let container = try! ModelContainer(for: RecordingSessionV2.self, configurations: .init(isStoredInMemoryOnly: true))
     let context = ModelContext(container)
     for i in 1...3 {
-        let session = RecordingSession(
-            ownerID: UUID(),
-            title: "Preview Climb \(i)",
+        let session = RecordingSessionV2(ownerID: UUID(), title: "Preview Climb \(i)", wallScanFolderName: nil)
+        session.addVideoAttempt(VideoAttemptV2(
             videoFileName: "preview\(i).mp4",
             videoDurationSeconds: Double(30 + i * 15),
             recordingDeviceOrientationRawValue: 1
-        )
+        ))
         context.insert(session)
     }
     return LibraryView()

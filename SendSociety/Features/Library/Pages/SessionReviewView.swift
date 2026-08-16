@@ -41,7 +41,7 @@ struct SessionReviewView: View {
     /// Finds/saves drawings by video timestamp, and builds the scrubber's marker list — the SAME
     /// engine `PlaybackView` uses (Features/Recording/Pages/PlaybackEngine.swift), reused here
     /// since this screen needs exactly the same two things from it.
-    private let drawingEngine: PlaybackEngine
+//    private let drawingEngine: PlaybackEngine
     /// Generates 3D pose estimates and skeleton previews, and finds/deletes saved 3D poses — see
     /// SessionReviewEngine.swift.
     private let reviewEngine: SessionReviewEngine
@@ -80,7 +80,7 @@ struct SessionReviewView: View {
         let url = sessionStore.videoURL(for: session)
         self.videoURL = url
         _videoModel = StateObject(wrappedValue: PlaybackModel(url: url))
-        drawingEngine = PlaybackEngine(session: session, sessionStore: sessionStore)
+//        drawingEngine = PlaybackEngine(session: session, sessionStore: sessionStore)
         reviewEngine = SessionReviewEngine(session: session, sessionStore: sessionStore)
     }
 
@@ -90,25 +90,25 @@ struct SessionReviewView: View {
             videoArea
             controlsArea
         }
-        .onAppear {
-            wallTextureReference = sessionStore.wallTextureReference(for: session)
-            refreshDrawingForCurrentVideoTime()
-        }
-        .onChange(of: videoModel.isPlaying) { _, isPlaying in
-            if !isPlaying { refreshDrawingForCurrentVideoTime() }
-        }
-        .onChange(of: videoModel.currentTime) { _, _ in
-            // Covers "was ALREADY paused, then dragged the slider" for the drawing preview (see
-            // `PlaybackView`'s matching handler for the full reasoning), and also keeps the
-            // skeleton preview in sync with wherever the scrubber lands.
-            if !videoModel.isPlaying {
-                refreshDrawingForCurrentVideoTime()
-            }
-            refreshSkeletonPreviewIfNeeded()
-        }
-        .onChange(of: drawingState.strokes) { _, newStrokes in
-            drawingEngine.saveDrawing(newStrokes, atVideoTime: currentDrawingVideoTime)
-        }
+//        .onAppear {
+//            wallTextureReference = sessionStore.wallTextureReference(for: session)
+//            refreshDrawingForCurrentVideoTime()
+//        }
+//        .onChange(of: videoModel.isPlaying) { _, isPlaying in
+//            if !isPlaying { refreshDrawingForCurrentVideoTime() }
+//        }
+//        .onChange(of: videoModel.currentTime) { _, _ in
+//            // Covers "was ALREADY paused, then dragged the slider" for the drawing preview (see
+//            // `PlaybackView`'s matching handler for the full reasoning), and also keeps the
+//            // skeleton preview in sync with wherever the scrubber lands.
+//            if !videoModel.isPlaying {
+//                refreshDrawingForCurrentVideoTime()
+//            }
+//            refreshSkeletonPreviewIfNeeded()
+//        }
+//        .onChange(of: drawingState.strokes) { _, newStrokes in
+//            drawingEngine.saveDrawing(newStrokes, atVideoTime: currentDrawingVideoTime)
+//        }
         .fullScreenCover(item: $reviewingEntry) { entry in
             SavedReconstructionReviewView(
                 entry: entry,
@@ -198,7 +198,7 @@ struct SessionReviewView: View {
 
     private var controlsArea: some View {
         VStack(spacing: 12) {
-            videoMarkerList
+//            videoMarkerList
             videoScrubber
             playbackButtonsRow
             if !videoModel.isPlaying {
@@ -347,26 +347,26 @@ struct SessionReviewView: View {
 
     /// Row of tappable dots along the scrubber — see `PlaybackView.videoMarkerList`'s doc
     /// comment for the full reasoning; same icon/color scheme here.
-    private var videoMarkerList: some View {
-        let moments = drawingEngine.getVideoMarkerList()
-        return Group {
-            if !moments.isEmpty, videoModel.duration > 0 {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        ForEach(moments) { moment in
-                            saveVideoMarkerButton(for: moment, trackWidth: geometry.size.width)
-                        }
-                    }
-                }
-                .frame(height: 26)
-            }
-        }
-    }
+//    private var videoMarkerList: some View {
+//        let moments = drawingEngine.getVideoMarkerList()
+//        return Group {
+//            if !moments.isEmpty, videoModel.duration > 0 {
+//                GeometryReader { geometry in
+//                    ZStack(alignment: .leading) {
+//                        ForEach(moments) { moment in
+//                            saveVideoMarkerButton(for: moment, trackWidth: geometry.size.width)
+//                        }
+//                    }
+//                }
+//                .frame(height: 26)
+//            }
+//        }
+//    }
 
     private func saveVideoMarkerButton(for videoMarkerModel: VideoMarkerModel, trackWidth: CGFloat) -> some View {
         let positionFraction = min(max(videoMarkerModel.videoTimeInSeconds / videoModel.duration, 0), 1)
         return Button {
-            goToVideoMarker(videoMarkerModel)
+//            goToVideoMarker(videoMarkerModel)
         } label: {
             Image(systemName: videoMarkerModel.has3DPose ? "cube.fill" : "pencil.tip.crop.circle.fill")
                 .font(.system(size: 15))
@@ -389,21 +389,21 @@ struct SessionReviewView: View {
 
     /// Call whenever the video pauses, or the scrubber moves while already paused, so the
     /// drawing on screen always matches the current position.
-    private func refreshDrawingForCurrentVideoTime() {
-        currentDrawingVideoTime = videoModel.currentTime
-        drawingState.load(strokes: drawingEngine.findDrawing(nearVideoTime: videoModel.currentTime))
-    }
+//    private func refreshDrawingForCurrentVideoTime() {
+//        currentDrawingVideoTime = videoModel.currentTime
+//        drawingState.load(strokes: drawingEngine.findDrawing(nearVideoTime: videoModel.currentTime))
+//    }
 
     /// Call when the coach taps a marker on the scrubber. Seeks there, shows whatever drawing
     /// belongs to that exact moment, and — if this moment has a saved 3D pose — opens it directly.
-    private func goToVideoMarker(_ videoMarkerModel: VideoMarkerModel) {
-        videoModel.seek(to: videoMarkerModel.videoTimeInSeconds)
-        currentDrawingVideoTime = videoMarkerModel.videoTimeInSeconds
-        drawingState.load(strokes: drawingEngine.findDrawing(nearVideoTime: videoMarkerModel.videoTimeInSeconds))
-        if videoMarkerModel.has3DPose, let entry = session.reconstructions.first(where: { $0.id == videoMarkerModel.id }) {
-            reviewingEntry = entry
-        }
-    }
+//    private func goToVideoMarker(_ videoMarkerModel: VideoMarkerModel) {
+//        videoModel.seek(to: videoMarkerModel.videoTimeInSeconds)
+//        currentDrawingVideoTime = videoMarkerModel.videoTimeInSeconds
+//        drawingState.load(strokes: drawingEngine.findDrawing(nearVideoTime: videoMarkerModel.videoTimeInSeconds))
+//        if videoMarkerModel.has3DPose, let entry = session.reconstructions.first(where: { $0.id == videoMarkerModel.id }) {
+//            reviewingEntry = entry
+//        }
+//    }
 
     /// Pulls the current paused frame out of the saved video and runs Vision on it fresh to build
     /// a real, saved 3D pose estimate. Delegates the actual work to `reviewEngine`.

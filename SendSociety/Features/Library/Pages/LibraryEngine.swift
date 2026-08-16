@@ -1,31 +1,30 @@
 import Foundation
 
-/// LibraryEngine is the "brain" behind the recordings list screen. It holds no state of its own
-/// — it just wraps `SessionStore` (the real on-disk storage) with three plain, easy-to-read
-/// functions. The View is responsible for holding onto whatever these functions return.
-///
-/// `@MainActor` because every function here calls into `SessionStore`, which is itself
-/// `@MainActor`-isolated (SwiftData's `ModelContext` isn't safe to touch off the main thread) —
-/// this engine is only ever created and called from a View anyway (already on the main thread),
-/// so this just tells the compiler what was already true.
 @MainActor
 struct LibraryEngine {
-    let sessionStore: SessionStore
+    let sessionStore: SessionStoreV2
 
-    /// Every saved session, in whatever order `SessionStore.fetchAll()` returns them.
-    func loadAllSessions() -> [RecordingSession] {
+    struct Item: Identifiable {
+        let videoAttempt: VideoAttemptV2
+        let session: RecordingSessionV2
+
+        var id: UUID { videoAttempt.id }
+    }
+
+    func loadAllVideoAttempts() -> [Item] {
         sessionStore.fetchAll()
+            .flatMap { session in
+                session.videoAttempts.map { Item(videoAttempt: $0, session: session) }
+            }
+            .sorted { $0.videoAttempt.createdAt > $1.videoAttempt.createdAt }
     }
 
-    /// Filters `sessions` down to ones whose title contains `searchText` (case-insensitive).
-    /// Returns `sessions` unchanged when `searchText` is empty.
-    func sessions(_ sessions: [RecordingSession], matching searchText: String) -> [RecordingSession] {
-        guard !searchText.isEmpty else { return sessions }
-        return sessions.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+    func items(_ items: [Item], matching query: String) -> [Item] {
+        guard !query.isEmpty else { return items }
+        return items.filter { $0.session.title.localizedCaseInsensitiveContains(query) }
     }
 
-    /// Permanently deletes `session` from disk.
-    func deleteSession(_ session: RecordingSession) {
-        sessionStore.delete(session)
+    func delete(_ item: Item) {
+        sessionStore.removeVideoAttempt(item.videoAttempt.id, from: item.session)
     }
 }

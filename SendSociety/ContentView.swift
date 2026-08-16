@@ -3,43 +3,18 @@ import ARKit
 import simd
 import SwiftData
 
-/// Root navigation for the 2-step MVP pipeline (record, then reconstruct). Owns the single shared ARSessionManager
-/// instance for the lifetime of the app so every step always sees the same ARSession (see
-/// ARSessionManager's doc comment for why this matters).
-///
-/// This view is now only ever reached via `LibraryView`'s "New Recording" entry point, and always
-/// returns to it when the flow finishes (see `onFinished`) — see `LibraryView`'s doc comment for
-/// the overall navigation shape.
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var arManager = ARSessionManager()
-    @State private var step: AppStep = .recording
-    @State private var reconstructionInput: ReconstructionInput?
 
-    // Owned here (not inside RecordingView) so navigating Step 4 -> back -> Step 3 re-shows the
-    // already-recorded clip for a re-pick instead of losing it and dropping back to record/stop.
-    @StateObject private var recorder = VideoRecorder()
+    @StateObject private var recorder = VideoRecorderEngine()
     @State private var recordedURL: URL?
 
-    /// Lazily constructed once `modelContext` is available (it isn't yet during `init`, since
-    /// `@Environment` values aren't resolved until the view is actually part of the hierarchy).
-    @State private var sessionStore: SessionStore?
-    /// The `RecordingSession` for THIS run through the pipeline, created the moment recording
-    /// finishes (as soon as there's a video + whatever wall scan data exists to save alongside
-    /// it) — see requirement #3's "every state should be saved." Every
-    /// video annotation and 3D reconstruction made for the rest of this flow gets folded into this
-    /// same session object.
-    @State private var currentSession: RecordingSession?
-    /// Non-nil when `createSessionIfNeeded` fails — drives a blocking alert (see `body`) so a save
-    /// failure is visible ON SCREEN rather than only in a console log (which needs a tethered
-    /// device to read). Added after exactly this happened silently: a full recording -> Step 4 ->
-    /// Done flow completed with no visible error, and the coach found an empty Library list with no
-    /// way to tell why. The recording/reconstruction flow itself still works even when this fires —
-    /// `currentSession` just stays nil, so nothing from this run gets persisted (see
-    /// `ReconstructionHost.upsertReconstruction()`'s nil-session no-op).
+    @State private var sessionController: SessionStoreV2?
+    @State private var recordingSession: RecordingSessionV2?
+    
     @State private var saveErrorMessage: String?
-    /// Called when the coach is done with this recording (explicit "Done" from Step 4, or backing
-    /// out) — returns to `LibraryView`. Set by whichever parent presented this view.
+    
     var onFinished: () -> Void = {}
 
     var body: some View {
@@ -47,12 +22,12 @@ struct ContentView: View {
             if !LiDARSupport.isSupported {
                 unsupportedDeviceView
             } else {
-                stepContent
+                recordingScreen
             }
         }
         .onAppear {
-            if sessionStore == nil {
-                sessionStore = SessionStore(modelContext: modelContext)
+            if sessionController == nil {
+                sessionController = SessionStoreV2(modelContext: modelContext)
             }
         }
         .alert(
@@ -68,55 +43,39 @@ struct ContentView: View {
             Text(message)
         }
     }
-
     @ViewBuilder
-    private var stepContent: some View {
-        switch step {
-        case .recording:
-            RecordingView(arManager: arManager, recorder: recorder, recordedURL: $recordedURL, session: currentSession, sessionStore: sessionStore) { url, frameStore, pausedSeconds in
-                reconstructionInput = ReconstructionInput(videoURL: url, frameStore: frameStore, pausedSeconds: pausedSeconds)
-                step = .reconstruction
-            }
+    private var recordingScreen: some View {
+        RecordingViewV2(arManager: arManager, recorder: recorder, recordedURL: $recordedURL, recordingSession: recordingSession, sessionController: sessionController, onSessionDone: onFinished)
             .onChange(of: recordedURL) { _, newValue in
-                createSessionIfNeeded(videoTempURL: newValue)
+                guard let newValue else { return }
+                addVideoAttempt(videoTempURL: newValue)
+                recordedURL = nil
             }
-        case .reconstruction:
-            if let input = reconstructionInput {
-                ReconstructionHost(arManager: arManager, input: input, session: currentSession, sessionStore: sessionStore, onBack: {
-                    // recordedURL is still set (owned by ContentView), so re-entering .recording
-                    // goes straight back to the scrubber instead of the record button.
-                    step = .recording
-                }, onFinished: onFinished)
-            }
-        }
     }
 
-    /// Saves the just-recorded video (plus whatever wall scan data exists so far) as a
-    /// new `RecordingSession` the moment recording stops — see `currentSession`'s doc comment.
-    /// Guarded so navigating back to the recording step and stopping a re-record doesn't create a
-    /// second session for what's still conceptually the same pipeline run (a coach who genuinely
-    /// wants a separate session re-records from Library's "New Recording" instead).
-    private func createSessionIfNeeded(videoTempURL: URL?) {
-        guard let videoTempURL, currentSession == nil, let sessionStore else { return }
-        let title = "Climb — " + Date().formatted(date: .abbreviated, time: .shortened)
+    private func addVideoAttempt(videoTempURL: URL) {
+        guard let sessionController else { return }
         do {
-            currentSession = try sessionStore.createSession(
-                title: title,
+            let session = try recordingSession ?? sessionController.createSession(
+                title: "Climb — " + Date().formatted(date: .abbreviated, time: .shortened),
+                wallTextureReference: arManager.wallTextureReference
+            )
+            recordingSession = session
+            
+            
+            
+            try sessionController.addVideoAttempt(
+                to: session,
                 videoTempURL: videoTempURL,
                 videoDurationSeconds: recorder.lastRecordingDuration,
                 recordingDeviceOrientationRawValue: recorder.recordingDeviceOrientation.rawValue,
-                wallTextureReference: arManager.wallTextureReference
+                clipStartTimestamp: recorder.sessionStartTimestamp ?? 0
             )
+            DebugLog.recording.info("Session created: id=\(session.id, privacy: .public), owner=\(session.ownerID, privacy: .public), title=\(session.title, privacy: .public)")
         } catch {
-            // See `saveErrorMessage`'s doc comment — this used to fail completely silently, with
-            // the recording/reconstruction flow continuing to work normally and just quietly never
-            // persisting anything, which is indistinguishable from "it worked" until you go back to
-            // an empty Library list. `error.localizedDescription` on a `CocoaError` from
-            // `FileManager` (the likely failure here — see `SessionFileStore`) is usually specific
-            // enough to act on directly, e.g. "There isn't enough space" for a full disk.
             let description = error.localizedDescription
             saveErrorMessage = "This recording's video couldn't be saved, so it won't appear in your library: \(description)"
-            DebugLog.recording.error("createSessionIfNeeded failed: \(description, privacy: .public)")
+            DebugLog.recording.error("addVideoAttempt failed: \(description, privacy: .public)")
         }
     }
 

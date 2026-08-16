@@ -31,7 +31,7 @@ struct PlaybackView: View {
     @StateObject private var drawingState = AnnotationState()
     /// Finds/saves drawings by video timestamp, and builds the scrubber's marker list. Plain
     /// Swift, no SwiftUI — see `PlaybackEngine.swift`.
-    private let engine: PlaybackEngine
+//    private let engine: PlaybackEngine()
 
     // MARK: - Plain on-screen state (just "what's toggled," no logic)
 
@@ -49,7 +49,7 @@ struct PlaybackView: View {
         self.sessionStore = sessionStore
         self.onGenerate = onGenerate
         _videoModel = StateObject(wrappedValue: PlaybackModel(url: url))
-        engine = PlaybackEngine(session: session, sessionStore: sessionStore)
+//        engine = PlaybackEngine(session: session, sessionStore: sessionStore)
     }
 
     var body: some View {
@@ -57,23 +57,23 @@ struct PlaybackView: View {
             videoArea
             controlsArea
         }
-        .onAppear(perform: refreshDrawingForCurrentVideoTime)
-        .onChange(of: videoModel.isPlaying) { _, isPlaying in
-            // Covers "was playing, tapped Pause."
-            if !isPlaying {
-                refreshDrawingForCurrentVideoTime()
-            }
-        }
+//        .onAppear(perform: refreshDrawingForCurrentVideoTime)
+//        .onChange(of: videoModel.isPlaying) { _, isPlaying in
+//            // Covers "was playing, tapped Pause."
+//            if !isPlaying {
+//                refreshDrawingForCurrentVideoTime()
+//            }
+//        }
         .onChange(of: videoModel.currentTime) { _, _ in
             // Covers "was ALREADY paused, then dragged the slider" — `isPlaying` never toggles
             // in that case, so the check above alone would leave a stale drawing on screen no
             // matter where the scrubber moves to.
-            if !videoModel.isPlaying {
-                refreshDrawingForCurrentVideoTime()
-            }
+//            if !videoModel.isPlaying {
+//                refreshDrawingForCurrentVideoTime()
+//            }
         }
         .onChange(of: drawingState.strokes) { _, newStrokes in
-            engine.saveDrawing(newStrokes, atVideoTime: currentDrawingVideoTime)
+//            engine.saveDrawing(newStrokes, atVideoTime: currentDrawingVideoTime)
         }
     }
 
@@ -107,7 +107,7 @@ struct PlaybackView: View {
 
     private var controlsArea: some View {
         VStack(spacing: 12) {
-            videoMarkerList
+//            videoMarkerList
             videoScrubber
             playbackButtonsRow
             if !videoModel.isPlaying {
@@ -176,26 +176,26 @@ struct PlaybackView: View {
     /// Row of tappable dots along the scrubber — one per saved moment (drawing and/or 3D pose).
     /// Cube icon/teal = has a 3D pose (orange tint if it was only estimated, not measured live).
     /// Pencil icon/orange = drawing only. Tapping a marker jumps straight to that moment.
-    private var videoMarkerList: some View {
-        let moments = engine.getVideoMarkerList()
-        return Group {
-            if !moments.isEmpty, videoModel.duration > 0 {
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        ForEach(moments) { moment in
-                            saveVideoMarkerButton(for: moment, trackWidth: geometry.size.width)
-                        }
-                    }
-                }
-                .frame(height: 26)
-            }
-        }
-    }
+//    private var videoMarkerList: some View {
+//        let moments = engine.getVideoMarkerList()
+//        return Group {
+//            if !moments.isEmpty, videoModel.duration > 0 {
+//                GeometryReader { geometry in
+//                    ZStack(alignment: .leading) {
+//                        ForEach(moments) { moment in
+//                            saveVideoMarkerButton(for: moment, trackWidth: geometry.size.width)
+//                        }
+//                    }
+//                }
+//                .frame(height: 26)
+//            }
+//        }
+//    }
 
     private func saveVideoMarkerButton(for videoMarkerModel: VideoMarkerModel, trackWidth: CGFloat) -> some View {
         let positionFraction = min(max(videoMarkerModel.videoTimeInSeconds / videoModel.duration, 0), 1)
         return Button {
-            goToVideoMarker(videoMarkerModel)
+//            goToVideoMarker(videoMarkerModel)
         } label: {
             Image(systemName: videoMarkerModel.has3DPose ? "cube.fill" : "pencil.tip.crop.circle.fill")
                 .font(.system(size: 15))
@@ -221,22 +221,22 @@ struct PlaybackView: View {
     /// Call whenever the video pauses, or the scrubber moves while already paused, so the
     /// drawing on screen always matches the current position (within `PlaybackEngine`'s ±1s
     /// matching window).
-    private func refreshDrawingForCurrentVideoTime() {
-        currentDrawingVideoTime = videoModel.currentTime
-        drawingState.load(strokes: engine.findDrawing(nearVideoTime: videoModel.currentTime))
-    }
+//    private func refreshDrawingForCurrentVideoTime() {
+//        currentDrawingVideoTime = videoModel.currentTime
+//        drawingState.load(strokes: engine.findDrawing(nearVideoTime: videoModel.currentTime))
+//    }
 
     /// Call when the coach taps a marker on the scrubber. Seeks the video there, shows whatever
     /// drawing belongs to that exact moment, and — if this moment has a saved 3D pose — jumps
     /// straight into the 3D view for it via `onGenerate`.
-    private func goToVideoMarker(_ videoMarkerModel: VideoMarkerModel) {
-        videoModel.seek(to: videoMarkerModel.videoTimeInSeconds)
-        currentDrawingVideoTime = videoMarkerModel.videoTimeInSeconds
-        drawingState.load(strokes: engine.findDrawing(nearVideoTime: videoMarkerModel.videoTimeInSeconds))
-        if videoMarkerModel.has3DPose {
-            onGenerate(videoURL, frameStore, videoMarkerModel.videoTimeInSeconds)
-        }
-    }
+//    private func goToVideoMarker(_ videoMarkerModel: VideoMarkerModel) {
+//        videoModel.seek(to: videoMarkerModel.videoTimeInSeconds)
+//        currentDrawingVideoTime = videoMarkerModel.videoTimeInSeconds
+//        drawingState.load(strokes: engine.findDrawing(nearVideoTime: videoMarkerModel.videoTimeInSeconds))
+//        if videoMarkerModel.has3DPose {
+//            onGenerate(videoURL, frameStore, videoMarkerModel.videoTimeInSeconds)
+//        }
+//    }
 }
 
 // `PlaybackModel` (the AVPlayer wrapper backing this screen's scrubber) lives in
