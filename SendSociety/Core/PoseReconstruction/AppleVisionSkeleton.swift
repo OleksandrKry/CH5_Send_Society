@@ -54,32 +54,6 @@ enum AppleVisionError: Error {
     case visionRequestFailed(Error)
 }
 
-/// FLOW OVERVIEW — this file is long because it's one continuous pipeline, not because it does
-/// many unrelated things. Read it in this order if you're tracing through it for the first time
-/// (or debugging a skeleton that looks wrong):
-///
-/// 1. `detect(inVideoFrame:deviceOrientation:)` — run Vision on a color frame, get back a
-///    `BodyPoseSample` (17 joint positions, all relative to the hip, plus a hip->camera matrix).
-///    This step never touches LiDAR — it's Vision's own estimate only.
-/// 2. `groundSkeletonRootAnchored(_:cameraOriginMatrix:context:)` — the main "make it accurate"
-///    step. Takes that `BodyPoseSample` plus a real LiDAR depth frame (`DepthGroundingContext`)
-///    and corrects ONLY the hip's depth against a real sensor reading, then scales every other
-///    joint to match (see that function's own doc comment for exactly why only the hip).
-/// 3. `worldPosition(cameraSpace:cameraTransform:)` — the last step, converting a
-///    camera-space position (what step 2 produces) into ARKit world space so it can be placed
-///    next to the wall mesh.
-///
-/// Everything else in this file is a private helper used somewhere inside step 2: reading real
-/// depth pixels (`lidarGroundedCameraSpacePosition`, `nearestConfidentDepth`,
-/// `bilateralWeightedDepth`), or fixing up which way is "up" (`rotateBearingToRawSensorFrame`,
-/// `cameraOrientation(for:)`). `projected2DImagePoints` is a separate, optional 4th step — a
-/// pure 2D sanity-check overlay, not part of the 3D grounding pipeline at all.
-///
-/// If a generated skeleton looks WRONG, the fastest way to narrow it down: wrong SHAPE (limbs
-/// disconnected, joints in impossible places) points at step 1 (Vision itself struggling with
-/// this frame); coherent shape but wrong ROTATION points at the orientation-fixing helpers;
-/// coherent shape, right rotation, wrong DISTANCE from the wall points at step 2's depth
-/// grounding.
 enum AppleVisionSkeletonExtractor {
 
     private static let jointMap: [(BodyJointName, VNHumanBodyPose3DObservation.JointName)] = [
@@ -174,30 +148,8 @@ enum AppleVisionSkeletonExtractor {
         let imageResolution: CGSize
         let depthMap: CVPixelBuffer
         let confidenceMap: CVPixelBuffer?
-        /// Device orientation for the SAME frame this depth data came from — MUST be the same
-        /// value passed as `deviceOrientation` to the `detect(in:)` call that produced the
-        /// `BodyPoseSample` being grounded against this context, or the bearing-rotation
-        /// correction in `lidarGroundedCameraSpacePosition` silently uses the wrong orientation.
-        /// See `RecordedFrameData.deviceOrientation`'s doc comment for the full story.
         let deviceOrientation: UIDeviceOrientation
-        /// Optional source of per-pixel brightness for bilateral-weighted depth grounding (see
-        /// `LumaSource`'s doc comment) — nil means "no color available for this context," in
-        /// which case grounding transparently falls back to the older nearest-valid-neighbor
-        /// search (`nearestConfidentDepth`) with no behavior change from before this feature
-        /// existed. Defaulted to nil here (rather than a required initializer parameter)
-        /// specifically so `RecordedFrameStore.swift`'s `RecordedFrameData.depthGroundingContext`
-        /// — which, BY DESIGN, has no color image to offer — keeps compiling completely
-        /// unchanged; see that type's doc comment for the on-device OOM-crash history that makes
-        /// "just store the color image too" a hard constraint, not an oversight. Step 4
-        /// (`LiveReconstructionGenerator`) attaches one after the fact via `withLumaSource(_:)`,
-        /// reusing the color frame it already re-extracts from the saved video for Vision
-        /// detection anyway — no extra decode/storage cost.
         let lumaSource: LumaSource?
-
-        /// Explicit initializer (rather than relying on the synthesized memberwise one) so
-        /// `lumaSource` can default to nil at every existing call site — including
-        /// `RecordedFrameStore.swift`'s `RecordedFrameData.depthGroundingContext`, which never
-        /// passes it at all — without those call sites needing any change.
         init(
             cameraTransform: simd_float4x4,
             intrinsics: simd_float3x3,
@@ -250,7 +202,7 @@ enum AppleVisionSkeletonExtractor {
     /// below (behind the camera, projected outside the frame, no confident depth nearby, or LiDAR
     /// and Vision disagreeing wildly) falls back to `visionOnlyFallback` (Vision's own, less
     /// reliable, depth-from-camera estimate for THIS joint) with `isGrounded: false`, rather than
-    /// discarding the position entirely. `groundSkeletonRootAnchored` (used by Step 4's
+    /// discarding the position entirely. `calibrateVisionToLidar` (used by Step 4's
     /// single-frame skeleton) calls this ONCE, for the hip/root joint only, and uses the result to
     /// scale every other joint's Vision-only estimate — see that function's doc comment for why.
     ///
@@ -347,16 +299,6 @@ enum AppleVisionSkeletonExtractor {
             return (visionOnlyFallback, false)
         }
 
-        // Sanity guard: reject if LiDAR and Vision wildly disagree, rather than silently
-        // producing a garbage position from a sign/axis bug. In practice this fires most often at
-        // a body-edge pixel where the confidence-dropout neighbor search (`nearestConfidentDepth`)
-        // latches onto the WALL behind/beside the joint instead of the joint itself (e.g. a hand
-        // near a hold, where the hand's own depth reading is unreliable but the wall right next to
-        // it isn't) — a real, confident LiDAR reading, just of the wrong surface, not a sign/axis
-        // bug. NOTE this guard can't catch a MILDER version of the same failure — a wrong nearby
-        // surface whose depth is only slightly off from the true joint depth — which is exactly
-        // why `groundSkeletonRootAnchored` no longer calls this per-joint for every joint; see that
-        // function's doc comment.
         let ratio = lidarDepth / zCV
         guard ratio.isFinite, ratio > 0.3, ratio < 3.0 else {
             DebugLog.reconstruction.error("LiDAR grounding rejected an outlier joint (LiDAR=\(lidarDepth, privacy: .public)m vs Vision=\(zCV, privacy: .public)m)")
@@ -368,6 +310,7 @@ enum AppleVisionSkeletonExtractor {
         // unreliable) depth-from-camera estimate with a real sensor measurement.
         let trueXcv = (u - cx) * lidarDepth / fx
         let trueYcv = (v - cy) * lidarDepth / fy
+        print("🧱 Lidar Depth: \(lidarDepth)")
         return (SIMD3<Float>(trueXcv, -trueYcv, -lidarDepth), true)
     }
 
@@ -458,7 +401,7 @@ enum AppleVisionSkeletonExtractor {
     }
 
     /// One rotation-fix "quarter turn" count per device orientation, layered on top of Vision's own
-    /// output inside `groundSkeletonRootAnchored`. Vision is already given `deviceOrientation` as a
+    /// output inside `calibrateVisionToLidar`. Vision is already given `deviceOrientation` as a
     /// hint before detection runs, so in theory this fix shouldn't need to vary by orientation — but
     /// that's only CONFIRMED true for `.portrait` (tested on a real device: 1 quarter turn
     /// counterclockwise). Every other case starts from that same value as a working hypothesis, not
@@ -492,7 +435,7 @@ enum AppleVisionSkeletonExtractor {
         return simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(0, 0, 1)))
     }
     
-    static func groundSkeletonRootAnchored(
+    static func calibrateVisionToLidar(
         _ positions: [BodyJointName: SIMD3<Float>],
         cameraOriginMatrix: simd_float4x4,
         context: DepthGroundingContext,
@@ -539,6 +482,7 @@ enum AppleVisionSkeletonExtractor {
             confidenceBytesPerRow: buffers.confidenceBytesPerRow,
             luma: buffers.luma
         )
+        
         guard hipResult.isGrounded, hipVisionCameraSpace.z != 0 else {
             DebugLog.reconstruction.error("Root-anchored grounding: hip LiDAR reading failed its sanity check — using Vision-only skeleton for this frame")
             return (visionOnly, false)
@@ -549,7 +493,7 @@ enum AppleVisionSkeletonExtractor {
         // camera — see `lidarGroundedCameraSpacePosition`'s doc comment), so their ratio IS the
         // same `lidarDepth / visionDepth` scale factor that function already sanity-checked
         // against the 0.3...3.0 bounds internally when it set `isGrounded = true` — no need to
-        // re-derive or re-check it here.
+        // re-derive or re-check it here.a
         let scale = hipResult.position.z / hipVisionCameraSpace.z
 
         var grounded: [BodyJointName: SIMD3<Float>] = [:]
@@ -561,11 +505,6 @@ enum AppleVisionSkeletonExtractor {
         return (grounded, true)
     }
 
-    /// Locks `context`'s depth (and, if present, confidence) buffers once and returns everything
-    /// `lidarGroundedCameraSpacePosition` needs to read from them — used by
-    /// `groundSkeletonRootAnchored`, which only needs to lock/unlock once per frame now that just
-    /// the hip joint is looked up against real depth. Caller MUST call `unlock()` (typically via
-    /// `defer`) exactly once, whether or not this returns nil.
     private struct LockedDepthBuffers {
         let depthWidth: Int
         let depthHeight: Int
@@ -861,17 +800,6 @@ enum AppleVisionSkeletonExtractor {
         return SIMD3<Float>(world.x, world.y, world.z)
     }
 
-    /// Converts a root-relative joint position into ARKit world space using Vision's OWN
-    /// estimate end-to-end (no LiDAR grounding) — the fallback path `ReconstructionEntityBuilder
-    /// .worldJointPositions` uses when there's no depth data for a frame at all.
-    ///
-    /// Composition: world = cameraTransform * cameraOriginMatrix * rootRelativePoint.
-    /// `cameraOriginMatrix` is documented by Apple as "a transform from the skeleton hip to the
-    /// camera" — by ARKit's own naming convention (an X-to-Y transform maps points FROM X-space
-    /// TO Y-space, e.g. ARCamera.transform maps camera space to world space), that reads as
-    /// hip-space -> camera-space. This path is noticeably less accurate than the LiDAR-grounded
-    /// one (Vision's own absolute depth/scale is the known-weak axis) — prefer
-    /// `groundSkeletonRootAnchored` wherever real depth is available.
     static func worldPosition(
         rootRelative: SIMD3<Float>,
         cameraOriginMatrix: simd_float4x4,
