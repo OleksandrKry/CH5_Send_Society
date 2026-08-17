@@ -46,6 +46,7 @@ struct OfflinePlaybackLayer: View {
                     poseError: result.poseError,
                     onBack: { self.result = nil },
                     onFinished: { self.result = nil },
+                    onDelete: deleteCurrentReconstruction,
                     initialAnnotationStrokes: result.initialAnnotationStrokes,
                     onAnnotationStrokesChanged: { strokes in
                         currentAnnotationStrokes = strokes
@@ -183,5 +184,21 @@ struct OfflinePlaybackLayer: View {
         attempt.setVideoAnnotation(timestampSeconds: timestampSeconds, strokes: strokes)
         sessionController.save(attempt, in: recordingSession)
         videoAnnotations = attempt.videoAnnotations
+    }
+    
+    private func deleteCurrentReconstruction() {
+        guard let result,
+              let match = savedReconstructions.first(where: {
+                  abs($0.timestampSeconds - result.timestampSeconds) <= savedEntryMatchWindowSeconds
+              })
+        else { return }
+        guard var attempt = recordingSession.videoAttempt(id: videoAttempt.id) else { return }
+        attempt.removeSkeleton(id: match.id)
+        sessionController.save(attempt, in: recordingSession)
+        savedReconstructions = attempt.video3DLidarSkeletons
+        self.result = nil
+        currentJointOverrides = nil
+        currentAnnotationStrokes = []
+        currentIsApproximate = false
     }
 }

@@ -457,49 +457,49 @@ enum AppleVisionSkeletonExtractor {
         return points
     }
 
-    /// Grounds the WHOLE skeleton in real LiDAR depth via a single trusted anchor — the hip/root
-    /// joint — rather than independently grounding all 17 joints against their own separate depth
-    /// pixel.
+    /// One rotation-fix "quarter turn" count per device orientation, layered on top of Vision's own
+    /// output inside `groundSkeletonRootAnchored`. Vision is already given `deviceOrientation` as a
+    /// hint before detection runs, so in theory this fix shouldn't need to vary by orientation — but
+    /// that's only CONFIRMED true for `.portrait` (tested on a real device: 1 quarter turn
+    /// counterclockwise). Every other case starts from that same value as a working hypothesis, not
+    /// a derived one.
     ///
-    /// Why: an earlier version of this (`groundJointsBestEffort`, now removed) looked up real
-    /// LiDAR depth for every joint independently, with only a per-joint sanity check comparing
-    /// that joint's own LiDAR reading against Vision's own estimate for that SAME joint. That
-    /// check can't catch the most common failure on a climbing wall: a joint (typically a wrist)
-    /// right next to a hold, where the WRONG nearby surface (the wall/hold beside the hand) has a
-    /// genuinely similar depth to the RIGHT surface (the hand itself) — so the bad reading sails
-    /// through the sanity check, and with no relationship enforced between joints, that one joint
-    /// simply renders wherever its bad depth reading says, flattened against the wall, with wildly
-    /// wrong bone length to its neighbors.
-    ///
-    /// This grounds ONLY the hip in real depth, using the exact same per-pixel lookup +
-    /// sanity-checked `lidarGroundedCameraSpacePosition` every joint used to go through
-    /// individually. The hip is a good anchor: on a climbing wall the torso is usually the body
-    /// part FARTHEST from the wall/holds (it leans back), so it's the joint least likely to suffer
-    /// the wrong-nearby-surface problem above. Every OTHER joint is then positioned by taking
-    /// Vision's own camera-space offset from the hip (which Vision already estimates as a
-    /// self-consistent, correctly-proportioned rigid skeleton) and scaling that offset — in all
-    /// three axes, uniformly — by `lidarHipDepth / visionHipDepth`. That's an isotropic scale
-    /// around the hip: every bone's LENGTH and RATIO to every other bone stays exactly what Vision
-    /// predicted; only the skeleton's overall size/placement relative to the camera is corrected
-    /// to match the one real depth measurement taken. No other joint ever gets its own independent
-    /// depth lookup, so no other joint can be individually corrupted by a bad reading.
-    ///
-    /// Trade-off, worth knowing: this deliberately gives up the (occasionally more accurate) real
-    /// per-joint depth `bilateralWeightedDepth` could get for a wrist/ankle actually touching a
-    /// hold, in exchange for the skeleton never being able to break its own proportions. If the hip
-    /// reading itself fails, `isGrounded` is false and every joint uses Vision's un-corrected
-    /// estimate — a coherent-but-unscaled skeleton, never a broken one.
+    /// HOW TO TUNE: record a clip in the orientation that looks wrong, generate its 3D skeleton, and
+    /// check which way it's rotated relative to the wall. Needs more counterclockwise rotation? Add 1
+    /// to that ONE case below. Needs clockwise? Subtract 1. Each case is independent — adjusting one
+    /// never touches the others.
+    private static func visionOnlyRotationQuarterTurns(for deviceOrientation: UIDeviceOrientation) -> Int {
+        switch deviceOrientation {
+            case .portrait: return 1           // CONFIRMED on real device
+            case .portraitUpsideDown: return 3 // need test on real device
+            case .landscapeLeft: return 0      // need test on real device
+            case .landscapeRight: return 2     // need test on real device
+            case .faceUp: return 1             // untested — recording face-up isn't a real use case anyway
+            case .faceDown: return 1           // untested — same
+            case .unknown: return 1            // untested — falls back to the portrait hypothesis
+            @unknown default: return 1
+        }
+    }
+
+    private static func visionOnlyRotationFix(for deviceOrientation: UIDeviceOrientation) -> simd_float4x4 {
+        let quarterTurns = visionOnlyRotationQuarterTurns(for: deviceOrientation)
+        let angle = Float(quarterTurns) * (.pi / 2)
+        return simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(0, 0, 1)))
+    }
+    
+    static func zAxisRotation(quarterTurns: Int) -> simd_float4x4 {
+        let angle = Float(quarterTurns) * (.pi / 2)
+        return simd_float4x4(simd_quatf(angle: angle, axis: SIMD3<Float>(0, 0, 1)))
+    }
+    
     static func groundSkeletonRootAnchored(
         _ positions: [BodyJointName: SIMD3<Float>],
         cameraOriginMatrix: simd_float4x4,
         context: DepthGroundingContext,
     ) -> (positions: [BodyJointName: SIMD3<Float>], isGrounded: Bool) {
-        // EMPIRICALLY DIRECTED, NOT COMPILE-VERIFIED, same as `estimateInitialRotation`: chosen to
-        // match the same "needs to rotate counterclockwise ~90°" report. If it's now wrong the
-        // OTHER way (over-rotated, or newly mirrored), the fix is a one-line change — flip the sign
-        // to `-.pi / 2`. Z is untouched either way — this rotation is about the optical axis, so
-        // depth-from-camera doesn't change.
-        let visionOnlyRotationFix = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
+        // was: let visionOnlyRotationFix = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
+        DebugLog.reconstruction.info("deviceOrientation = \(String(describing: context.deviceOrientation), privacy: .public) (raw: \(context.deviceOrientation.rawValue, privacy: .public))")
+        let visionOnlyRotationFix = Self.visionOnlyRotationFix(for: context.deviceOrientation)
         
         func visionOnlyCameraSpace(_ rootRelative: SIMD3<Float>) -> SIMD3<Float> {
             let local4 = SIMD4<Float>(rootRelative.x, rootRelative.y, rootRelative.z, 1)
