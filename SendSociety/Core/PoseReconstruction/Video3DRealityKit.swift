@@ -234,18 +234,26 @@ enum Video3DRealityKit {
         for y in 0..<depthHeight {
             for x in 0..<depthWidth {
                 guard let depth = depthAt(x, y) else { continue }
-                // Standard pixel-projection convention (X-right, Y-down, Z-forward) -> ARKit
-                // camera convention (X-right, Y-up, Z-backward).
+                // 1. Convert pixel coordinate to normalized optical space
                 let xCV = (Float(x) + 0.5 - cx) * depth / fx
                 let yCV = (Float(y) + 0.5 - cy) * depth / fy
-                let cameraSpace = SIMD3<Float>(xCV, -yCV, -depth)
-                let world4 = reference.cameraTransform * SIMD4<Float>(cameraSpace, 1)
+                
+                // 2. Standard ARKit Camera Coordinate: X-Right, Y-Up, Z-Forward (-depth)
+                // Ensure this matches your Vision Joint unprojection direction!
+                let cameraSpace = SIMD4<Float>(xCV, -yCV, -depth, 1.0)
+                
+                // 3. Transform to ARKit World Space
+                let world4 = reference.cameraTransform * cameraSpace
+                
                 let index = y * depthWidth + x
                 worldPoints[index] = SIMD3<Float>(world4.x, world4.y, world4.z)
                 depths[index] = depth
             }
         }
-
+        // Temporary diagnostic check inside pointCloudWallEntity
+        print("📸 Intrinsics Matrix: \(reference.intrinsics)")
+        print("📐 Image Res: \(reference.imageResolution), Depth Grid: \(depthWidth)x\(depthHeight)")
+        print("🔍 Scaled fx: \(fx), cx: \(cx)")
         // One mesh vertex per valid pixel, with a pixel-exact UV (same frame as the color photo,
         // so no reprojection needed).
         var positions: [SIMD3<Float>] = []
@@ -430,29 +438,6 @@ enum Video3DRealityKit {
 
     // MARK: - Skeleton
 
-    /// World-space position of every detected joint. Exposed separately (not just buried inside
-    /// `skeletonEntity`) so callers — e.g. ReconstructionView's camera-framing code — can use the
-    /// same positions without recomputing them.
-    ///
-    /// When `depthContext` is available (the recorded frame had real LiDAR depth), the WHOLE
-    /// skeleton is grounded via a single trusted anchor — the hip/root joint — through
-    /// `BodyPose3DExtractor.groundSkeletonRootAnchored`: the hip's real LiDAR depth vs. Vision's
-    /// own depth guess for the hip gives a scale factor, and every other joint's Vision-estimated
-    /// offset from the hip is scaled by that SAME factor, uniformly in all three axes. This is
-    /// what fixes both the climber-height accuracy and the skeleton-vs-wall placement (the wall
-    /// mesh is built from the SAME depth data, so grounding the skeleton in it puts both in a
-    /// consistent, real-world-scaled coordinate space instead of Vision's own, less reliable,
-    /// depth guess) — see that function's doc comment for why this replaced an earlier version
-    /// that grounded every joint independently (it couldn't guarantee bone lengths stayed
-    /// physically plausible). Falls back to the ungrounded, Vision-only estimate for every joint
-    /// when there's no depth data for this frame at all, OR when the hip's own LiDAR reading fails
-    /// its sanity check.
-    ///
-    /// `wallReference`, when available, is used as a final sanity pass (`keepInFrontOfWall`) —
-    /// the wall's point-cloud mesh and the skeleton are grounded from DIFFERENT frames (Step 1's
-    /// single reference frame vs. the paused Step 3 frame), so any tracking drift or depth noise
-    /// between those two moments can leave a joint positioned behind the wall's own reconstructed
-    /// surface, which is physically impossible for a climber actually on the wall.
     static func generate3DJointPositions(
         from sample: AppleVisionSkeleton,
         cameraTransform: simd_float4x4,
@@ -473,10 +458,10 @@ enum Video3DRealityKit {
         }
 
         // Ground the hip in real LiDAR depth, then scale every other joint's Vision-estimated
-        // offset from the hip by that same factor — see `groundSkeletonRootAnchored`'s doc comment
+        // offset from the hip by that same factor — see `calibrateVisionToLidar`'s doc comment
         // for why this replaced independently grounding all 17 joints.
         
-        let (grounded, isRootGrounded) = AppleVisionSkeletonExtractor.groundSkeletonRootAnchored(
+        let (grounded, isRootGrounded) = AppleVisionSkeletonExtractor.calibrateVisionToLidar(
             sample.rootRelativePositions,
             cameraOriginMatrix: sample.cameraOriginMatrix,
             context: depthContext
@@ -526,13 +511,14 @@ enum Video3DRealityKit {
         guard let wallReference, let plane = wallPlane(from: wallReference) else { return positions }
         var corrected = positions
         var pushedCount = 0
-        for (joint, position) in positions {
-            let signedDistance = simd_dot(position - plane.point, plane.normal)
-            if signedDistance < margin {
-                corrected[joint] = position + plane.normal * (margin - signedDistance)
-                pushedCount += 1
-            }
-        }
+//        for (joint, position) in positions {
+//            let signedDistance = simd_dot(position - plane.point, plane.normal)
+//            if signedDistance < margin {
+//                corrected[joint] = position + plane.normal * (margin - signedDistance)
+//                pushedCount += 1
+//            }
+//        }
+        
         if pushedCount > 0 {
             DebugLog.reconstruction.info("Pushed \(pushedCount, privacy: .public)/\(positions.count, privacy: .public) joints back in front of the wall plane")
         }

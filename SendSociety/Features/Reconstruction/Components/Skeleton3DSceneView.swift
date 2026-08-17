@@ -64,6 +64,50 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             Video3DRealityKit.generate3DJointPositions(from: $0, cameraTransform: cameraTransform ?? matrix_identity_float4x4, depthContext: depthContext, wallReference: wallTextureReference)
         } ?? [:])
 
+        // Insert directly after skeletonPositions is defined in makeUIView:
+
+        print("================ RealityKit Scene Diagnostic ================")
+
+        // 1. Camera Recording Position in World Space
+        if let cameraTransform = cameraTransform {
+            let camWorldPos = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+            print("📸 Camera World Position: \(camWorldPos)")
+        } else {
+            print("⚠️ cameraTransform is NIL! Using identity matrix baseline.")
+        }
+
+        // 2. Wall Mesh Anchor World Positions
+        print("🧱 Wall Anchor Count: \(wallAnchors.count)")
+        for (index, anchor) in wallAnchors.enumerated() {
+            let t = anchor.transform.columns.3
+            let anchorPos = SIMD3<Float>(t.x, t.y, t.z)
+            print("   ↳ Anchor [\(index)] Position: \(anchorPos)")
+        }
+
+        // 3. Skeleton Joint Positions in RealityKit Space
+        if let hipPos = skeletonPositions[.root] ?? skeletonPositions[.root] {
+            print("👤 Grounded Hip Position in World: \(hipPos)")
+            
+            // Calculate distance from recording camera to hip
+            if let cameraTransform = cameraTransform {
+                let camPos = SIMD3<Float>(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+                let camToHipDist = simd_distance(camPos, hipPos)
+                print("📏 Cam-to-Hip World Distance: \(camToHipDist) meters")
+            }
+            
+            // Calculate distance from nearest wall anchor to hip
+            if let firstAnchor = wallAnchors.first {
+                let t = firstAnchor.transform.columns.3
+                let anchorPos = SIMD3<Float>(t.x, t.y, t.z)
+                let hipToWallDist = simd_distance(anchorPos, hipPos)
+                print("📐 Hip-to-Wall Anchor Distance: \(hipToWallDist) meters")
+            }
+        } else {
+            print("⚠️ No Hip joint found in skeletonPositions!")
+        }
+
+        print("=============================================================")
+        
         // `originalPositions` is the auto-detected baseline used both as the ROM constraints'
         // reference direction (see SkeletonPoseEditor) and as what "Reset Pose" reverts to.
         // `currentPositions` starts identical to it and only diverges once the coach drags
