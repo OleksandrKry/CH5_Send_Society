@@ -424,7 +424,7 @@ enum AppleVisionSkeletonExtractor {
     /// `lidarGroundedCameraSpacePosition`'s early-outs) rather than returning a wrong/clamped
     /// point.
     static func projected2DImagePoints(
-        from sample: BodyPoseSample,
+        from sample: AppleVisionSkeleton,
         intrinsics: simd_float3x3,
         imageResolution: CGSize,
         deviceOrientation: UIDeviceOrientation
@@ -899,5 +899,9 @@ enum AppleVisionSkeletonExtractor {
         case .portraitUpsideDown: return .left
         default: return .right
         }
+    }
+    enum BodyPoseError: Error {
+        case noPersonDetected
+        case visionRequestFailed(Error)
     }
 }

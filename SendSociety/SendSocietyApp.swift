@@ -21,6 +21,6 @@ struct SendSocietyApp: App {
         // rather than being separate related models). This also makes `\.modelContext` available
         // via `@Environment` anywhere in the view hierarchy, which is how `LibraryView`/
         // `ContentView` construct their `SessionStore`.
-        .modelContainer(for: [RecordingSession.self, RecordingSessionV2.self])
+        .modelContainer(for: [RecordingSessionV2.self])
     }
 }

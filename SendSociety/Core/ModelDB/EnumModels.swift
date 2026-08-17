@@ -2,19 +2,6 @@ import CoreGraphics
 import Foundation
 import simd
 
-/// The 2 linear steps of the MVP capture pipeline. Navigation is strictly forward for this
-/// phase — no re-ordering, no skipping.
-enum AppStep: Int, CaseIterable {
-    case recording = 0
-    case reconstruction
-
-    var title: String {
-        switch self {
-        case .recording: return "Record the Climb"
-        case .reconstruction: return "3D Reconstruction"
-        }
-    }
-}
 
 /// Simplified tracking-quality bucket surfaced to the coach as a real-time on-screen cue.
 enum TrackingQuality: Equatable {
@@ -77,13 +64,6 @@ let skeletonBones: [SkeletonBone] = [
 
 // MARK: - 2D annotation markup (Step 4's "draw on the paused view" feature)
 
-/// Which drawing tool made an `AnnotationStroke` — see that type's doc comment for the shape of
-/// `points` each one implies. Declared here (AppCore), not in the SwiftUI file that draws it
-/// (`Features/Reconstruction/AnnotationOverlay.swift`), because `AnnotationStroke` is a persisted
-/// model type: `Core/Persistence/RecordingSession.swift` stores arrays of it directly, and a
-/// persistence file should never need to import a feature's UI file just to compile its own saved
-/// data. `AnnotationOverlay`/`AnnotationToolbar`/`AnnotationState` (the actual drawing surface,
-/// toolbar, and `ObservableObject` state) stay in Features/Reconstruction — those genuinely are UI.
 enum AnnotationTool: String, CaseIterable, Codable {
     case pen, line, angle, circle, arrow, text
 

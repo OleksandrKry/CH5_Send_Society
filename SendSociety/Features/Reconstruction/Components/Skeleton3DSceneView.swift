@@ -36,7 +36,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
         context.coordinator.arView = view
 
         let contentAnchor = AnchorEntity(world: .zero)
-        contentAnchor.addChild(ReconstructionEntityBuilder.wallEntity(from: wallAnchors, textureReference: wallTextureReference))
+        contentAnchor.addChild(Video3DRealityKit.wallEntity(from: wallAnchors, textureReference: wallTextureReference))
         view.scene.addAnchor(contentAnchor)
         context.coordinator.contentAnchor = contentAnchor
 
@@ -204,7 +204,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             target = position + forward * distance
         }
         if target == nil {
-            target = ReconstructionEntityBuilder.surfacePoint(nearRayFrom: position, direction: forward, in: wallAnchors)
+            target = Video3DRealityKit.surfacePoint(nearRayFrom: position, direction: forward, in: wallAnchors)
         }
         guard let target else { return nil }
 

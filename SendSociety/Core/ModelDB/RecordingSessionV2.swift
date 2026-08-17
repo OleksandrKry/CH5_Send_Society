@@ -69,3 +69,8 @@ final class RecordingSessionV2 {
         videoAttempts.removeAll { $0.id == id }
     }
 }
+struct VideoAnnotationEntry: Codable, Identifiable {
+    var id: UUID = UUID()
+    var timestampSeconds: Double
+    var strokes: [AnnotationStrokeModel]
+}
