@@ -25,6 +25,9 @@ struct VideoAttemptV2: Identifiable {
     var videoAnnotations: [VideoAnnotationEntry] = []
     var video3DLidarSkeletons: [Video3DLidarSkeleton] = []
     
+    var routeGrade: RouteGrade = .v0
+    var climberID: UUID?
+    
     /// Upserts a video annotation for timestampSeconds, replacing whatever was previously saved
     /// within mergeToleranceSeconds of it — so scrubbing to a slightly different position on a
     /// later visit updates the existing markup instead of piling up near-duplicate entries.
@@ -62,6 +65,7 @@ extension VideoAttemptV2: Codable {
         case id, createdAt, videoFileName, videoDurationSeconds
         case recordingDeviceOrientationRawValue, videoAnnotations, video3DLidarSkeletons
         case clipStartTimestamp
+        case routeGrade, climberID
     }
 
     init(from decoder: Decoder) throws {
@@ -74,6 +78,8 @@ extension VideoAttemptV2: Codable {
         videoAnnotations = try container.decodeIfPresent([VideoAnnotationEntry].self, forKey: .videoAnnotations) ?? []
         video3DLidarSkeletons = try container.decodeIfPresent([Video3DLidarSkeleton].self, forKey: .video3DLidarSkeletons) ?? []
         clipStartTimestamp = try container.decodeIfPresent(Double.self, forKey: .clipStartTimestamp) ?? 0
+        routeGrade = try container.decodeIfPresent(RouteGrade.self, forKey: .routeGrade) ?? .v0
+        climberID = try container.decodeIfPresent(UUID.self, forKey: .climberID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -86,6 +92,8 @@ extension VideoAttemptV2: Codable {
         try container.encode(videoAnnotations, forKey: .videoAnnotations)
         try container.encode(video3DLidarSkeletons, forKey: .video3DLidarSkeletons)
         try container.encode(clipStartTimestamp, forKey: .clipStartTimestamp)
+        try container.encode(routeGrade, forKey: .routeGrade)
+        try container.encodeIfPresent(climberID, forKey: .climberID)
     }
 }
 

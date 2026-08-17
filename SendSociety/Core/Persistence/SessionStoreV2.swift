@@ -86,14 +86,18 @@ final class SessionStoreV2: ObservableObject {
         videoTempURL: URL,
         videoDurationSeconds: Double,
         recordingDeviceOrientationRawValue: Int,
-        clipStartTimestamp: TimeInterval
+        clipStartTimestamp: TimeInterval,
+        routeGrade: RouteGrade,
+        climberID: UUID?
     ) throws -> VideoAttemptV2 {
         let videoFileName = try SessionFileStore.moveVideoIntoPermanentStorage(from: videoTempURL)
         let attempt = VideoAttemptV2(
             videoFileName: videoFileName,
             videoDurationSeconds: videoDurationSeconds,
             recordingDeviceOrientationRawValue: recordingDeviceOrientationRawValue,
-            clipStartTimestamp: clipStartTimestamp
+            clipStartTimestamp: clipStartTimestamp,
+            routeGrade: routeGrade,
+            climberID: climberID
         )
         session.addVideoAttempt(attempt)
         save()
@@ -128,4 +132,32 @@ final class SessionStoreV2: ObservableObject {
         guard let wallScanFolderName = session.wallScanFolderName else { return nil }
         return WallScanArchive.load(folderName: wallScanFolderName, from: SessionFileStore.wallScansDirectory) // exact call TBD from the real file
     }
+    /// The most recently recorded video attempt across every session, if any — nil only on a genuine
+    /// first-ever launch (no videos recorded yet). Used to prefill the New Recording setup screen with
+    /// the last-used route grade/climber instead of always resetting to V0/"New Climber".
+    func mostRecentVideoAttempt() -> VideoAttemptV2? {
+        fetchAll().flatMap(\.videoAttempts).max(by: { $0.createdAt < $1.createdAt })
+    }
+    
+    /// All climbers belonging to the current identity, alphabetically — a direct bounded query, not a
+    /// scan of video-attempt data.
+    func fetchAllClimbers() -> [Climber] {
+        let ownerID = UserIdentity.current.id
+        let descriptor = FetchDescriptor<Climber>(
+            predicate: #Predicate { $0.ownerID == ownerID },
+            sortBy: [SortDescriptor(\.name)]
+        )
+        return (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    @discardableResult
+    func createClimber(name: String) throws -> Climber {
+        let climber = Climber(ownerID: UserIdentity.current.id, name: name)
+        modelContext.insert(climber)
+        try modelContext.save()
+        return climber
+    }
 }
+    
+    
+

@@ -24,22 +24,15 @@ struct LibraryRow: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(session.title)
+                Text(item.climber?.name ?? "Unknown Climber")
                     .font(.headline)
                     .lineLimit(1)
                 Text(videoAttempt.createdAt.formatted(date: .abbreviated, time: .shortened))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 HStack(spacing: 10) {
+                    Label(videoAttempt.routeGrade.rawValue, systemImage: "mountain.2.fill")
                     Label(durationLabel, systemImage: "clock")
-                    if !videoAttempt.video3DLidarSkeletons.isEmpty {
-                        Label("\(videoAttempt.video3DLidarSkeletons.count) 3D", systemImage: "cube.fill")
-                            .foregroundStyle(.teal)
-                    }
-                    if session.wallScanFolderName != nil {
-                        Image(systemName: "square.stack.3d.up.fill")
-                            .foregroundStyle(.secondary)
-                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

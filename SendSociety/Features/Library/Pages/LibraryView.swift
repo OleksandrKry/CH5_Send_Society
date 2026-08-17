@@ -22,6 +22,7 @@ struct LibraryView: View {
     @State private var isPresentingNewRecording = false
     @State private var reviewingItem: LibraryEngine.Item?
     @State private var searchText = ""
+    @State private var climberFilter: Climber?
 
     /// The "brain" for this screen — built fresh from `sessionController` since it holds no state
     /// of its own. nil until `sessionController` exists (see `setUpIfNeeded()`).
@@ -31,7 +32,7 @@ struct LibraryView: View {
 
     /// `items`, narrowed down by whatever's typed into the search field.
     private var filteredItems: [LibraryEngine.Item] {
-        engine?.items(items, matching: searchText) ?? []
+        engine?.items(items, matching: searchText, climberID: climberFilter?.id) ?? []
     }
 
     var body: some View {
@@ -42,7 +43,10 @@ struct LibraryView: View {
                 } else if items.isEmpty {
                     emptyStateView
                 } else {
-                    itemList
+                    VStack(spacing: 0) {
+                        climberFilterRow
+                        itemList
+                    }
                 }
             }
             .navigationTitle("Send Society")
@@ -155,6 +159,20 @@ struct LibraryView: View {
             engine.delete(filteredItems[index])
         }
         reloadItems()
+    }
+    private var climberFilterRow: some View {
+        HStack {
+            Picker("Climber", selection: $climberFilter) {
+                Text("All Climbers").tag(Climber?.none)
+                ForEach(engine?.fetchAllClimbers() ?? []) { climber in
+                    Text(climber.name).tag(Optional(climber))
+                }
+            }
+            .pickerStyle(.menu)
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.top, 8)
     }
 }
 
