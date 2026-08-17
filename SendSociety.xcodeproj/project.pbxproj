@@ -41,6 +41,10 @@
 		6851B7973031D87500940510 /* AppleVisionEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7963031D87000940510 /* AppleVisionEstimator.swift */; };
 		6851B7993031D97E00940510 /* OfflinePlaybackLayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7983031D97300940510 /* OfflinePlaybackLayer.swift */; };
 		6851B7AB3032B2BD00940510 /* AnnotationComponent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7AA3032B2BD00940510 /* AnnotationComponent.swift */; };
+		6851B7B63032B9CF00940510 /* RouteGrade.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B53032B9CA00940510 /* RouteGrade.swift */; };
+		6851B7B83032BDC300940510 /* Climber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B73032BDBF00940510 /* Climber.swift */; };
+		6851B7BA3032BE3700940510 /* ClimberStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B93032BE3300940510 /* ClimberStore.swift */; };
+		6851B7BC3032BF5000940510 /* RecordingClimberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7BB3032BF4400940510 /* RecordingClimberView.swift */; };
 		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
 		75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */; };
 		7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */; };
@@ -93,6 +97,10 @@
 		6851B7963031D87000940510 /* AppleVisionEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleVisionEstimator.swift; sourceTree = "<group>"; };
 		6851B7983031D97300940510 /* OfflinePlaybackLayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflinePlaybackLayer.swift; sourceTree = "<group>"; };
 		6851B7AA3032B2BD00940510 /* AnnotationComponent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnnotationComponent.swift; sourceTree = "<group>"; };
+		6851B7B53032B9CA00940510 /* RouteGrade.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RouteGrade.swift; sourceTree = "<group>"; };
+		6851B7B73032BDBF00940510 /* Climber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Climber.swift; sourceTree = "<group>"; };
+		6851B7B93032BE3300940510 /* ClimberStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimberStore.swift; sourceTree = "<group>"; };
+		6851B7BB3032BF4400940510 /* RecordingClimberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingClimberView.swift; sourceTree = "<group>"; };
 		7A2EACC8906161F57BB8245E /* LibraryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEngine.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
 		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
@@ -205,6 +213,7 @@
 		6851B774302F656600940510 /* Persistence */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7B93032BE3300940510 /* ClimberStore.swift */,
 				6851B776302F65F400940510 /* SessionStoreV2.swift */,
 			);
 			path = Persistence;
@@ -229,6 +238,8 @@
 		84F89BFA6AC94AB09ECF5216 /* ModelDB */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7B73032BDBF00940510 /* Climber.swift */,
+				6851B7B53032B9CA00940510 /* RouteGrade.swift */,
 				6851B78030305BC800940510 /* Video3DLidarModel.swift */,
 				6851B768302F5FBD00940510 /* VideoAttemptV2.swift */,
 				6851B766302F5F4C00940510 /* RecordingSessionV2.swift */,
@@ -313,6 +324,7 @@
 		D85CCAB55A88FB7D404872C9 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				6851B7BB3032BF4400940510 /* RecordingClimberView.swift */,
 				6851B7903030C90300940510 /* RecordingEngineV2.swift */,
 				6851B77B30304AEF00940510 /* RecordingComponent */,
 				6851B779303039FD00940510 /* PlaybackLayerV2.swift */,
@@ -430,6 +442,7 @@
 			files = (
 				6851B78D3030C76D00940510 /* ARFrameData.swift in Sources */,
 				6851B78B30308CAB00940510 /* Video3DRealityKit.swift in Sources */,
+				6851B7BA3032BE3700940510 /* ClimberStore.swift in Sources */,
 				05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */,
 				6851B759302F18F800940510 /* AnnotationStrokeModel.swift in Sources */,
 				BAA080405F83421C8E619A5B /* ARSessionManager.swift in Sources */,
@@ -450,6 +463,7 @@
 				6851B769302F5FC100940510 /* VideoAttemptV2.swift in Sources */,
 				18D235F2DD5FE6F2CA7739D8 /* PlaybackEngine.swift in Sources */,
 				384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */,
+				6851B7B83032BDC300940510 /* Climber.swift in Sources */,
 				D3373B559DA7FDC2CCE1AF39 /* SkeletonImageOverlayView.swift in Sources */,
 				6851B7973031D87500940510 /* AppleVisionEstimator.swift in Sources */,
 				6851B78F3030C87400940510 /* VideoRecorderEngine.swift in Sources */,
@@ -467,12 +481,14 @@
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
 				6851B7953031D58200940510 /* OfflinePlaybackView.swift in Sources */,
 				C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */,
+				6851B7BC3032BF5000940510 /* RecordingClimberView.swift in Sources */,
 				F67314CEECD44118860F3125 /* SessionFileStore.swift in Sources */,
 				6851B767302F5F5000940510 /* RecordingSessionV2.swift in Sources */,
 				6851B7993031D97E00940510 /* OfflinePlaybackLayer.swift in Sources */,
 				2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */,
 				DC9F38EBD4AEF3CFF2222AA4 /* LibraryEngine.swift in Sources */,
 				6851B74A302EE58100940510 /* PlaybackViewV2.swift in Sources */,
+				6851B7B63032B9CF00940510 /* RouteGrade.swift in Sources */,
 				6851B765302F50A500940510 /* RecordingViewV2.swift in Sources */,
 				7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */,
 				9702347BBA1E4DC8BEDFAB0B /* DeviceDiagnostics.swift in Sources */,

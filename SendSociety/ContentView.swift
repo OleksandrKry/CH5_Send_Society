@@ -15,12 +15,36 @@ struct ContentView: View {
     
     @State private var saveErrorMessage: String?
     
+    @State private var routeGrade: RouteGrade?
+    @State private var selectedClimber: Climber?
+    
     var onFinished: () -> Void = {}
 
     var body: some View {
         Group {
             if !LiDARSupport.isSupported {
                 unsupportedDeviceView
+            } else if routeGrade == nil || selectedClimber == nil {
+                if let sessionController {
+                    let existingClimbers = sessionController.fetchAllClimbers()
+                    let mostRecent = sessionController.mostRecentVideoAttempt()
+                    let defaultClimber = mostRecent?.climberID.flatMap { id in
+                        existingClimbers.first { $0.id == id }
+                    }
+                    RecordingClimberView(
+                        existingClimbers: existingClimbers,
+                        initialRouteGrade: mostRecent?.routeGrade ?? .v0,
+                        initialClimber: defaultClimber,
+                        onStart: { grade, climber in
+                            routeGrade = grade
+                            selectedClimber = climber
+                        },
+                        onCancel: onFinished,
+                        createClimber: { name in try sessionController.createClimber(name: name) }
+                    )
+                } else {
+                    ProgressView()
+                }
             } else {
                 recordingScreen
             }
@@ -54,24 +78,22 @@ struct ContentView: View {
     }
 
     private func addVideoAttempt(videoTempURL: URL) {
-        guard let sessionController else { return }
-        do {
-            let session = try recordingSession ?? sessionController.createSession(
-                title: "Climb — " + Date().formatted(date: .abbreviated, time: .shortened),
-                wallTextureReference: arManager.wallTextureReference
-            )
-            recordingSession = session
-            
-            
-            
-            try sessionController.addVideoAttempt(
-                to: session,
-                videoTempURL: videoTempURL,
-                videoDurationSeconds: recorder.lastRecordingDuration,
-                recordingDeviceOrientationRawValue: recorder.recordingDeviceOrientation.rawValue,
-                clipStartTimestamp: recorder.sessionStartTimestamp ?? 0
-            )
-            DebugLog.recording.info("Session created: id=\(session.id, privacy: .public), owner=\(session.ownerID, privacy: .public), title=\(session.title, privacy: .public)")
+        guard let sessionController, let routeGrade, let selectedClimber else { return }
+            do {
+                let session = try recordingSession ?? sessionController.createSession(
+                    title: "Climb — " + Date().formatted(date: .abbreviated, time: .shortened),
+                    wallTextureReference: arManager.wallTextureReference
+                )
+                recordingSession = session
+                try sessionController.addVideoAttempt(
+                    to: session,
+                    videoTempURL: videoTempURL,
+                    videoDurationSeconds: recorder.lastRecordingDuration,
+                    recordingDeviceOrientationRawValue: recorder.recordingDeviceOrientation.rawValue,
+                    clipStartTimestamp: recorder.sessionStartTimestamp ?? 0,
+                    routeGrade: routeGrade,
+                    climberID: selectedClimber.id
+                )
         } catch {
             let description = error.localizedDescription
             saveErrorMessage = "This recording's video couldn't be saved, so it won't appear in your library: \(description)"
