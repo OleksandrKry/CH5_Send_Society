@@ -45,6 +45,7 @@ struct PlaybackLayerV2: View {
                     poseError: result.poseError,
                     onBack: { self.result = nil },
                     onFinished: { self.result = nil },
+                    onDelete: deleteCurrentReconstruction,
                     initialAnnotationStrokes: result.initialAnnotationStrokes,
                     onAnnotationStrokesChanged: { strokes in
                         currentAnnotationStrokes = strokes
@@ -82,7 +83,15 @@ struct PlaybackLayerV2: View {
     }
     
     private func generateOrLoad(atTimestamp timestampSeconds: Double) {
+        
         lastPlaybackTimestamp = timestampSeconds
+        
+        let nearestFrame = frameStore.nearestFrame(toPlaybackSeconds: timestampSeconds, clipStartTimestamp: videoAttempt.clipStartTimestamp)
+        let deviceOrientation = nearestFrame?.deviceOrientation
+            ?? UIDeviceOrientation(rawValue: videoAttempt.recordingDeviceOrientationRawValue)
+            ?? .portrait
+        DebugLog.reconstruction.info("generateOrLoad: deviceOrientation = \(String(describing: deviceOrientation), privacy: .public), source = \(nearestFrame != nil ? "nearestFrame" : "videoAttempt fallback", privacy: .public)")
+        
         let input = Video3DLidarInput(videoURL: videoURL, frameStore: frameStore, timestampSeconds: timestampSeconds, clipStartTimestamp: videoAttempt.clipStartTimestamp)
         let newResult = Generate3DEngine.loadOrGenerate(input: input, video3DLidarSkeletons: savedReconstructions, wallReference: arManager.wallTextureReference)
         result = newResult
@@ -120,5 +129,22 @@ struct PlaybackLayerV2: View {
         attempt.setVideoAnnotation(timestampSeconds: timestampSeconds, strokes: strokes)
         sessionController.save(attempt, in: recordingSession)
         videoAnnotations = attempt.videoAnnotations
+    }
+    private func deleteCurrentReconstruction() {
+        guard let result,
+              let recordingSession,
+              let sessionController,
+              var attempt = recordingSession.videoAttempt(id: videoAttempt.id),
+              let match = savedReconstructions.first(where: {
+                  abs($0.timestampSeconds - result.timestampSeconds) <= 0.3 // mirrors Generate3DEngine's match window
+              })
+        else { return }
+
+        attempt.removeSkeleton(id: match.id)
+        sessionController.save(attempt, in: recordingSession)
+        savedReconstructions = attempt.video3DLidarSkeletons
+        self.result = nil
+        currentJointOverrides = nil
+        currentAnnotationStrokes = []
     }
 }

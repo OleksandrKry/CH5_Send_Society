@@ -19,7 +19,23 @@ enum AppleVisionEstimator {
     enum EstimationError: Error {
         case couldNotReadFrame
     }
-
+    /// Own tuned lookup, separate from `AppleVisionSkeletonExtractor.visionOnlyRotationQuarterTurns`
+    /// — this corrects a different mismatch (world-placement camera transform, not Vision-camera-
+    /// space joints), so don't assume a value that's right there is right here too. Portrait's
+    /// value matches the old Estimate-3D-only path's confirmed-on-device correction; every other
+    /// case starts from that same value as an untested working hypothesis.
+    private static func estimateInitialRotationQuarterTurns(for deviceOrientation: UIDeviceOrientation) -> Int {
+        switch deviceOrientation {
+        case .portrait: return 1           // CONFIRMED on real device (old Estimate-3D-only path)
+        case .portraitUpsideDown: return 1 // untested
+        case .landscapeLeft: return 1      // untested
+        case .landscapeRight: return 1     // untested
+        case .faceUp: return 1
+        case .faceDown: return 1
+        case .unknown: return 1
+        @unknown default: return 1
+        }
+    }
     static func estimate(
         videoURL: URL,
         atSeconds timestamp: Double,
@@ -36,9 +52,9 @@ enum AppleVisionEstimator {
                 deviceOrientation: deviceOrientation
             )
 
-            // Same fixed 90° correction as the old Estimate-3D-only path — only affects this
-            // no-live-depth fallback, never the live-generate or load-saved paths.
-            let estimateInitialRotation = simd_float4x4(simd_quatf(angle: .pi / 2, axis: SIMD3<Float>(0, 0, 1)))
+            let estimateInitialRotation = AppleVisionSkeletonExtractor.zAxisRotation(
+                quarterTurns: estimateInitialRotationQuarterTurns(for: deviceOrientation)
+            )
             let approximateCameraTransform = (wallReference?.cameraTransform ?? matrix_identity_float4x4) * estimateInitialRotation
 
             let originalAppleVisionJoints = Video3DRealityKit.generate3DJointPositions(
