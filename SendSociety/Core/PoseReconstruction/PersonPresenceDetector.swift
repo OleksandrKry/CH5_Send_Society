@@ -34,7 +34,7 @@ enum PersonPresenceDetector {
             // rather than a second, possibly-drifting copy of that mapping.
             let handler = VNImageRequestHandler(
                 cvPixelBuffer: pixelBuffer,
-                orientation: BodyPose3DExtractor.cameraOrientation(for: deviceOrientation),
+//                orientation: AppleVisionSkeleton.cameraOrientation(for: deviceOrientation),
                 options: [:]
             )
             do {
