@@ -82,10 +82,15 @@ struct RecordingClimberView: View {
                     }
                 }
             }
-            .navigationTitle("New Recording")
+            .scrollDisabled(true)
+//            .navigationTitle("New Recording")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
+                }
+                ToolbarItem(placement: .principal) {
+                    Text("New Recording")
+                        .font(.headline)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: start)

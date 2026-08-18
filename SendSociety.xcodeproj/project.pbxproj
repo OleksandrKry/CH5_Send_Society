@@ -9,6 +9,14 @@
 /* Begin PBXBuildFile section */
 		05E7BED3019A4D3EAB1E789A /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD60C283C01847C79E70DCB9 /* ContentView.swift */; };
 		18D235F2DD5FE6F2CA7739D8 /* PlaybackEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ABB3C7555213BF17F8CE38E /* PlaybackEngine.swift */; };
+		2BE3307C303436D7007F4792 /* InitialScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33076303436D7007F4792 /* InitialScreen.swift */; };
+		2BE3307D303436D7007F4792 /* Tutorial1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33077303436D7007F4792 /* Tutorial1.swift */; };
+		2BE3307E303436D7007F4792 /* Tutorial2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33078303436D7007F4792 /* Tutorial2.swift */; };
+		2BE3307F303436D7007F4792 /* Tutorial3.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33079303436D7007F4792 /* Tutorial3.swift */; };
+		2BE33080303436D7007F4792 /* TutorialOne.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE3307A303436D7007F4792 /* TutorialOne.swift */; };
+		2BE3308C303438AA007F4792 /* UIColor+Hex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE3308A303438AA007F4792 /* UIColor+Hex.swift */; };
+		2BE3308D303438AA007F4792 /* AppColor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33088303438AA007F4792 /* AppColor.swift */; };
+		2BE3308E303438AA007F4792 /* AppTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE33089303438AA007F4792 /* AppTypography.swift */; };
 		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
 		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
 		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
@@ -69,6 +77,14 @@
 		20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodableSIMD.swift; sourceTree = "<group>"; };
 		230F572E3FAC418F97998530 /* PixelBufferCopy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PixelBufferCopy.swift; sourceTree = "<group>"; };
 		27E4A34523354A76B854D9EF /* SendSociety.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SendSociety.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		2BE33076303436D7007F4792 /* InitialScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InitialScreen.swift; sourceTree = "<group>"; };
+		2BE33077303436D7007F4792 /* Tutorial1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial1.swift; sourceTree = "<group>"; };
+		2BE33078303436D7007F4792 /* Tutorial2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial2.swift; sourceTree = "<group>"; };
+		2BE33079303436D7007F4792 /* Tutorial3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tutorial3.swift; sourceTree = "<group>"; };
+		2BE3307A303436D7007F4792 /* TutorialOne.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TutorialOne.swift; sourceTree = "<group>"; };
+		2BE33088303438AA007F4792 /* AppColor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppColor.swift; sourceTree = "<group>"; };
+		2BE33089303438AA007F4792 /* AppTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTypography.swift; sourceTree = "<group>"; };
+		2BE3308A303438AA007F4792 /* UIColor+Hex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIColor+Hex.swift"; sourceTree = "<group>"; };
 		3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeshSceneView.swift; sourceTree = "<group>"; };
 		42BF999F98834402830605C8 /* EnumModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnumModels.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -121,7 +137,6 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		1A8F2D9D302AEBF2005888A8 /* Onboarding */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Onboarding; sourceTree = "<group>"; };
 		6851B74B302EE59D00940510 /* PlaybackComponent */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = PlaybackComponent; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
@@ -176,6 +191,28 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		2BE3307B303436D7007F4792 /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				2BE33076303436D7007F4792 /* InitialScreen.swift */,
+				2BE33077303436D7007F4792 /* Tutorial1.swift */,
+				2BE33078303436D7007F4792 /* Tutorial2.swift */,
+				2BE33079303436D7007F4792 /* Tutorial3.swift */,
+				2BE3307A303436D7007F4792 /* TutorialOne.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
+		2BE3308B303438AA007F4792 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				2BE33088303438AA007F4792 /* AppColor.swift */,
+				2BE33089303438AA007F4792 /* AppTypography.swift */,
+				2BE3308A303438AA007F4792 /* UIColor+Hex.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
 		358F98F5A91CBC675D091BA1 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
@@ -196,18 +233,11 @@
 		41F75D8BD2244A8FB1682FD2 /* Reconstruction */ = {
 			isa = PBXGroup;
 			children = (
+				2BE3307B303436D7007F4792 /* Onboarding */,
 				358F98F5A91CBC675D091BA1 /* Pages */,
 				26F50DCE09913BC0078E5F09 /* Components */,
 			);
 			path = Reconstruction;
-			sourceTree = "<group>";
-		};
-		6851B748302EE4AC00940510 /* Recovered References */ = {
-			isa = PBXGroup;
-			children = (
-				1A8F2D9D302AEBF2005888A8 /* Onboarding */,
-			);
-			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		6851B774302F656600940510 /* Persistence */ = {
@@ -271,7 +301,6 @@
 			children = (
 				DCC4545EE6244131AD317726 /* SendSociety */,
 				A120921418274E2D8E25CD04 /* Products */,
-				6851B748302EE4AC00940510 /* Recovered References */,
 			);
 			sourceTree = "<group>";
 		};
@@ -352,6 +381,7 @@
 			children = (
 				CD60C283C01847C79E70DCB9 /* ContentView.swift */,
 				1E5E1CA18D9647FFA80F535D /* SendSocietyApp.swift */,
+				2BE3308B303438AA007F4792 /* DesignSystem */,
 				D58979A097D144C2A7F9AB24 /* Core */,
 				DA503DBA94B84CF89FE3BBF5 /* Features */,
 				B0E8DE97AC814F5FA1113BC7 /* Resources */,
@@ -383,7 +413,6 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				1A8F2D9D302AEBF2005888A8 /* Onboarding */,
 				6851B74B302EE59D00940510 /* PlaybackComponent */,
 			);
 			name = SendSociety;
@@ -491,6 +520,14 @@
 				6851B7B63032B9CF00940510 /* RouteGrade.swift in Sources */,
 				6851B765302F50A500940510 /* RecordingViewV2.swift in Sources */,
 				7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */,
+				2BE3307C303436D7007F4792 /* InitialScreen.swift in Sources */,
+				2BE3308C303438AA007F4792 /* UIColor+Hex.swift in Sources */,
+				2BE3308D303438AA007F4792 /* AppColor.swift in Sources */,
+				2BE3308E303438AA007F4792 /* AppTypography.swift in Sources */,
+				2BE3307D303436D7007F4792 /* Tutorial1.swift in Sources */,
+				2BE3307E303436D7007F4792 /* Tutorial2.swift in Sources */,
+				2BE3307F303436D7007F4792 /* Tutorial3.swift in Sources */,
+				2BE33080303436D7007F4792 /* TutorialOne.swift in Sources */,
 				9702347BBA1E4DC8BEDFAB0B /* DeviceDiagnostics.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -624,7 +661,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = XFJU5ZLRLC;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -652,7 +689,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = XFJU5ZLRLC;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

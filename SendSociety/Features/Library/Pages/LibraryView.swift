@@ -23,6 +23,10 @@ struct LibraryView: View {
     @State private var reviewingItem: LibraryEngine.Item?
     @State private var searchText = ""
     @State private var climberFilter: Climber?
+    
+    @State private var showClimberPicker = false
+    @State private var selectedRouteGrade: RouteGrade?
+    @State private var selectedClimber: Climber?
 
     /// The "brain" for this screen — built fresh from `sessionController` since it holds no state
     /// of its own. nil until `sessionController` exists (see `setUpIfNeeded()`).
@@ -36,50 +40,144 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if !LiDARSupport.isSupported {
-                    unsupportedDeviceView
-                } else if items.isEmpty {
-                    emptyStateView
-                } else {
-                    VStack(spacing: 0) {
-                        climberFilterRow
-                        itemList
+        ZStack {
+            NavigationStack {
+                Group {
+                    if !LiDARSupport.isSupported {
+                        unsupportedDeviceView
+                    } else if items.isEmpty {
+                        emptyStateView
+                    } else {
+                        VStack(spacing: 0) {
+                            climberFilterRow
+                            itemList
+                        }
+                    }
+                }
+                .navigationTitle("Send Society")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button {
+                            showClimberPicker = true
+                        } label: {
+                            Label(
+                                "New Recording",
+                                systemImage: "plus.circle.fill"
+                            )
+                        }
                     }
                 }
             }
-            .navigationTitle("Send Society")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        isPresentingNewRecording = true
-                    } label: {
-                        Label("New Recording", systemImage: "plus.circle.fill")
-                    }
-                }
+            .searchable(
+                text: $searchText,
+                prompt: "Search recordings"
+            )
+
+            // MARK: Climber / Grade Popup
+
+            if showClimberPicker {
+                Color.black
+                    .opacity(0.35)
+                    .ignoresSafeArea()
+
+                climberPickerPopup
             }
         }
-        .searchable(text: $searchText, prompt: "Search recordings")
         .onAppear(perform: setUpIfNeeded)
-        .fullScreenCover(isPresented: $isPresentingNewRecording, onDismiss: reloadItems) {
-            ContentView(onFinished: {
-                isPresentingNewRecording = false
-                reloadItems()
-            })
+
+        // MARK: Fullscreen Recording
+
+        .fullScreenCover(
+            isPresented: $isPresentingNewRecording,
+            onDismiss: reloadItems
+        ) {
+            ContentView(
+                initialRouteGrade: selectedRouteGrade,
+                initialClimber: selectedClimber,
+                onFinished: {
+                    isPresentingNewRecording = false
+                    reloadItems()
+                }
+            )
         }
-        .fullScreenCover(item: $reviewingItem, onDismiss: reloadItems) { item in
+
+        // Your existing playback cover
+        .fullScreenCover(
+            item: $reviewingItem,
+            onDismiss: reloadItems
+        ) { item in
             if let sessionController {
                 OfflinePlaybackLayer(
-                    videoURL: sessionController.videoURL(for: item.videoAttempt),
+                    videoURL: sessionController.videoURL(
+                        for: item.videoAttempt
+                    ),
                     videoAttempt: item.videoAttempt,
                     recordingSession: item.session,
                     sessionController: sessionController,
-                    onDismiss: { reviewingItem = nil }
+                    onDismiss: {
+                        reviewingItem = nil
+                    }
                 )
             }
         }
     }
+
+    @ViewBuilder
+    private var climberPickerPopup: some View {
+        if let sessionController {
+            let existingClimbers =
+                sessionController.fetchAllClimbers()
+
+            let mostRecent =
+                sessionController.mostRecentVideoAttempt()
+
+            let defaultClimber =
+                mostRecent?.climberID.flatMap { id in
+                    existingClimbers.first {
+                        $0.id == id
+                    }
+                }
+
+            RecordingClimberView(
+                existingClimbers: existingClimbers,
+                initialRouteGrade: mostRecent?.routeGrade ?? .v0,
+                initialClimber: selectedClimber ?? defaultClimber,
+
+                onStart: { grade, climber in
+                    selectedRouteGrade = grade
+                    selectedClimber = climber
+
+                    // Close popup
+                    showClimberPicker = false
+
+                    // Open recording FULL SCREEN
+                    isPresentingNewRecording = true
+                },
+
+                onCancel: {
+                    showClimberPicker = false
+                },
+
+                createClimber: { name in
+                    try sessionController.createClimber(
+                        name: name
+                    )
+                }
+            )
+            .frame(width: 420, height: 400)
+            .background(.regularMaterial)
+            .clipShape(
+                RoundedRectangle(cornerRadius: 24)
+            )
+            .shadow(
+                color: .black.opacity(0.25),
+                radius: 20
+            )
+        } else {
+            ProgressView()
+        }
+    }
+
 
     private var itemList: some View {
         List {
@@ -108,7 +206,7 @@ struct LibraryView: View {
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 32)
             Button {
-                isPresentingNewRecording = true
+                showClimberPicker = true
             } label: {
                 Text("New Recording")
                     .font(.headline)
