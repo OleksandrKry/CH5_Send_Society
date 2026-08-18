@@ -9,36 +9,59 @@ import SwiftUI
 
 struct InitialScreen: View {
     
-    @State private var goToTutorial: Bool = false
+    @State private var goToOnboarding: Bool = false
     
     var body: some View {
+        
+    
         NavigationStack {
-            VStack{
-                Spacer()
+    
+                VStack{
+                    Spacer()
                 
-                Text("See it. Learn it. Send it.")
-                    .font(.largeTitle)
-                
-                Spacer()
-                
-                Button {
-                    goToTutorial = true
-                } label: {
-                    Text("Get Started")
-                        .font(.system(size: 24, weight: .medium, design: .default))
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 30)
-                        .background(Color(red: 75/255, green: 105/255, blue: 141/255))
-                        .foregroundColor(.white)
-                        .cornerRadius(50)
+                    Image("GetBeta Logo_Final")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 420)
+                        .padding(40)
+                        .shadow(color: Color.white.opacity(1.0),
+                                radius: 30,
+                                x: 0,
+                                y: 0)
+                    
+                    Text("See it. Learn it. Send it.")
+                        .font(.system(size: 36, weight: .bold))
+                    
+                    Spacer()
+                    
+                    Button {
+                        goToOnboarding = true
+                    } label: {
+                        Text("Get Started")
+                            .font(.title)
+                            .fontWeight(.bold)
+                            .padding(.vertical,24)
+                            .padding(.horizontal, 100)
+                            .background(Color(red: 75/255, green: 105/255, blue: 141/255))
+                            .clipShape(Capsule())
+                            .foregroundColor(.white)
+                            }
+                            .glassEffect()
+                            .padding(.bottom, 40)
+                            .navigationDestination(isPresented: $goToOnboarding) {
+                                OnboardingAll()
+                    }
                 }
-                .glassEffect()
-                .padding(.bottom, 40)
-                .navigationDestination(isPresented: $goToTutorial) {
-                    TutorialOne()
-                }
-            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background {
+                                    Image("GetBeta Wall 1")
+                                        .resizable()
+                                        .scaledToFill()
+                                        .ignoresSafeArea()
+                                }
         }
+        
+    
     }
 }
 

@@ -14,7 +14,8 @@ struct SendSocietyApp: App {
         WindowGroup {
             // LibraryView is the app's actual root now — see its doc comment for the overall
             // navigation shape. ContentView (the Steps 1-4 capture pipeline) is presented FROM it.
-            LibraryView()
+//            LibraryView()
+            InitialScreen()
         }
         // Registers the persistence schema for the whole app — `RecordingSession` is the only
         // `@Model` type (see its doc comment for why child data is flattened into it as JSON
