@@ -323,9 +323,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             case wholeBodyHandle
         }
         private var selection: SkeletonSelection?
-        private var isDraggingSelectedJoint = false
         private var isDraggingWholeBody = false
-        private var dragPlaneAnchor: SIMD3<Float>?
         private var lastOrbitTouchLocation: CGPoint?
         private var lastBodyDragLocation: CGPoint?
         private let jointSelectionRadius: Float = 0.08
@@ -343,7 +341,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
                 }
             }
         }
-        private var draggedAxis: HandleAxis?
+        private var draggedAxis: GizmoAxis?
         private var axisDragAnchor: (screenLocation: CGPoint, startPosition: SIMD3<Float>)?
         private var bodyDragStartPositions: [BodyJointName: SIMD3<Float>]?
         private let axisHandleLength: Float = 0.15        // how far the arrow tip sits from the selected point — tune on device
@@ -394,8 +392,6 @@ struct Skeleton3DSceneView: UIViewRepresentable {
                 case .joint(let selected):
                     if let axis = axisHandleWithinRadius(at: location, around: currentPositions[selected]) {
                         beginAxisDrag(axis: axis, at: location, startPosition: currentPositions[selected]!)
-                    } else if withinRadius(selected, at: location) {
-                        beginJointDrag(joint: selected)
                     } else if let other = jointWithinRadius(at: location, excluding: selected) {
                         finishEditingSelection()
                         selectJoint(other)
@@ -429,8 +425,6 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             case .changed:
                 if draggedAxis != nil {
                     updateAxisDrag(screenLocation: location)
-                } else if isDraggingSelectedJoint, case .joint(let selected) = selection {
-                    updateJointDrag(joint: selected, screenLocation: location)
                 } else if isDraggingWholeBody, let last = lastBodyDragLocation {
                     updateBodyDrag(from: last, to: location)
                     lastBodyDragLocation = location
@@ -447,9 +441,6 @@ struct Skeleton3DSceneView: UIViewRepresentable {
                     draggedAxis = nil
                     axisDragAnchor = nil
                     bodyDragStartPositions = nil
-                } else if isDraggingSelectedJoint {
-                    isDraggingSelectedJoint = false
-                    dragPlaneAnchor = nil
                 } else if isDraggingWholeBody {
                     isDraggingWholeBody = false
                     lastBodyDragLocation = nil
@@ -474,19 +465,33 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             return screenRadius(forWorldPosition: worldPosition, selectionRadiusMeters: jointSelectionRadius, in: view)
         }
         
-        private func axisHandleWithinRadius(at location: CGPoint, around origin: SIMD3<Float>?) -> HandleAxis? {
+        private func axisHandleWithinRadius(at location: CGPoint, around origin: SIMD3<Float>?) -> GizmoAxis? {
             guard let arView, let origin else { return nil }
-            var best: (axis: HandleAxis, distance: CGFloat)?
-            for axis in HandleAxis.allCases {
-                let handlePosition = origin + axis.worldDirection * axisHandleLength
-                guard let (center, radius) = screenRadius(forWorldPosition: handlePosition, selectionRadiusMeters: axisHandleSelectionRadius, in: arView) else { continue }
-                let distance = hypot(location.x - center.x, location.y - center.y)
+            var best: (axis: GizmoAxis, distance: CGFloat)?
+            for axis in GizmoAxis.allCases {
+                let tip = origin + axis.worldDirection * axisHandleLength
+                guard let originScreen = arView.project(origin), let tipScreen = arView.project(tip),
+                      // Reuses the exact same world-radius-to-screen-pixels conversion (and the same
+                      // `jointSelectionRadius`) that joints use, so an arrow feels exactly as forgiving
+                      // to grab as a joint does — not a stricter target.
+                      let (_, radius) = screenRadius(forWorldPosition: tip, selectionRadiusMeters: jointSelectionRadius, in: arView)
+                else { continue }
+                let distance = Self.distance(from: location, toSegmentFrom: originScreen, to: tipScreen)
                 guard distance <= radius else { continue }
                 if best == nil || distance < best!.distance { best = (axis, distance) }
             }
             return best?.axis
         }
-        private func beginAxisDrag(axis: HandleAxis, at location: CGPoint, startPosition: SIMD3<Float>) {
+
+        private static func distance(from point: CGPoint, toSegmentFrom a: CGPoint, to b: CGPoint) -> CGFloat {
+            let abx = b.x - a.x, aby = b.y - a.y
+            let lengthSquared = abx * abx + aby * aby
+            guard lengthSquared > 0.0001 else { return hypot(point.x - a.x, point.y - a.y) }
+            let t = max(0, min(1, ((point.x - a.x) * abx + (point.y - a.y) * aby) / lengthSquared))
+            let closest = CGPoint(x: a.x + t * abx, y: a.y + t * aby)
+            return hypot(point.x - closest.x, point.y - closest.y)
+        }
+        private func beginAxisDrag(axis: GizmoAxis, at location: CGPoint, startPosition: SIMD3<Float>) {
             draggedAxis = axis
             axisDragAnchor = (location, startPosition)
             if selection == .wholeBodyHandle {
@@ -543,42 +548,9 @@ struct Skeleton3DSceneView: UIViewRepresentable {
             return best?.joint
         }
 
-        private func withinRadius(_ joint: BodyJointName, at location: CGPoint) -> Bool {
-            guard let arView, let (center, radius) = screenRadius(for: joint, in: arView) else { return false }
-            return hypot(location.x - center.x, location.y - center.y) <= radius
-        }
-
         private func selectJoint(_ joint: BodyJointName) {
             selection = .joint(joint)
             parent.draggedJoint = joint
-            rebuildSkeleton()
-        }
-
-        private func beginJointDrag(joint: BodyJointName) {
-            guard let startPosition = currentPositions[joint] else { return }
-            isDraggingSelectedJoint = true
-            dragPlaneAnchor = startPosition
-        }
-
-        /// Gets a screen-space ray from `ARView` and the camera's forward vector, then hands off to
-        /// `JointDragProjector` (Core/PoseReconstruction) for the actual unprojection math — see
-        /// that type's doc comment for the technique. UNVERIFIED ON DEVICE: `ARView.ray(through:)`
-        /// is a real, documented RealityKit API (screen point -> world-space ray), also usable in
-        /// non-AR camera mode.
-        private func updateJointDrag(joint: BodyJointName, screenLocation: CGPoint) {
-            guard let arView, let cameraEntity, let planePoint = dragPlaneAnchor,
-                  let ray = arView.ray(through: screenLocation)
-            else { return }
-
-            let cameraForward = cameraEntity.orientation(relativeTo: nil).act(SIMD3<Float>(0, 0, -1))
-            guard let targetWorldPosition = JointDragProjector.project(
-                rayOrigin: ray.origin,
-                rayDirection: ray.direction,
-                planePoint: planePoint,
-                planeNormal: cameraForward
-            ) else { return }
-
-            currentPositions = SkeletonPoseEditor.dragJoint(joint, to: targetWorldPosition, current: currentPositions, original: originalPositions)
             rebuildSkeleton()
         }
 
@@ -592,9 +564,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
         func resetToOriginal() {
             currentPositions = originalPositions
             selection = nil
-            isDraggingSelectedJoint = false
             isDraggingWholeBody = false
-            dragPlaneAnchor = nil
             lastBodyDragLocation = nil
             parent.draggedJoint = nil
             hasAppliedOverride = false
@@ -625,9 +595,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
         func finishEditingSelection() {
             guard selection != nil else { return }
             selection = nil
-            isDraggingSelectedJoint = false
             isDraggingWholeBody = false
-            dragPlaneAnchor = nil
             lastBodyDragLocation = nil
             parent.draggedJoint = nil
             if currentPositions != originalPositions {
@@ -647,16 +615,16 @@ struct Skeleton3DSceneView: UIViewRepresentable {
                 if case .joint(let j) = selection { return j }
                 return nil
             }()
-            let highlighted = highlightedJoint.map { (joints: SkeletonPoseEditor.impactedJoints(for: $0), bones: SkeletonPoseEditor.impactedBones(for: $0)) }
+            
             let newSkeleton = Video3DRealityKit.skeletonEntity(
                 from: parent.appleVisionSkeleton,
                 cameraTransform: parent.cameraTransform ?? matrix_identity_float4x4,
                 depthContext: parent.depthContext,
                 wallReference: parent.wallTextureReference,
                 overridePositions: currentPositions,
-                highlightedJoints: highlighted?.joints ?? [],
-                highlightedBones: highlighted?.bones ?? [],
-                hideMannequinBody: parent.isEditingPose
+                hideMannequinBody: parent.isEditingPose,
+                selectedJoint: highlightedJoint,
+                draggedAxis: draggedAxis
             )
             contentAnchor.addChild(newSkeleton)
             skeletonEntityRef = newSkeleton

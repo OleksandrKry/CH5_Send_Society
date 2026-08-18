@@ -10,6 +10,25 @@ import simd
 import UIKit
 import CoreImage
 
+
+enum GizmoAxis: CaseIterable {
+    case x, y, z
+    var worldDirection: SIMD3<Float> {
+        switch self {
+        case .x: return SIMD3<Float>(1, 0, 0)
+        case .y: return SIMD3<Float>(0, 1, 0)
+        case .z: return SIMD3<Float>(0, 0, 1)
+        }
+    }
+    var color: UIColor {
+        switch self {
+        case .x: return .systemRed
+        case .y: return .systemBlue
+        case .z: return .systemPurple
+        }
+    }
+}
+
 enum Video3DRealityKit {
 
     // MARK: - Joint entity naming
@@ -526,29 +545,14 @@ enum Video3DRealityKit {
     }
 
     static func skeletonEntity(
-        /// Optional (unlike `worldJointPositions`'s required `sample`) so a saved session review
-        /// can render a previously-generated reconstruction via `overridePositions` alone, without
-        /// re-running Vision — see `RecordingSession`/`ReconstructionEntry`'s doc comments for why
-        /// that data can't be regenerated after the fact. Only actually read when
-        /// `overridePositions` is nil; `??`'s right side is lazily evaluated, so passing nil here
-        /// is safe as long as `overridePositions` is provided.
         from sample: AppleVisionSkeleton?,
         cameraTransform: simd_float4x4,
         depthContext: AppleVisionSkeletonExtractor.DepthGroundingContext? = nil,
         wallReference: ARSessionManager.WallTextureReference? = nil,
-        /// When present, used INSTEAD of the auto-detected/grounded positions below — the coach's
-        /// manually-dragged pose (see `SkeletonPoseEditor`). Passing nil (the default) preserves
-        /// the original auto-only behavior exactly.
         overridePositions: [BodyJointName: SIMD3<Float>]? = nil,
-        /// Joints/bones about to be affected by an in-progress drag (see
-        /// `SkeletonPoseEditor.impactedJoints`/`impactedBones`) — rendered in a distinct highlight
-        /// color so the coach can see what will move BEFORE releasing the drag, not just after.
-        highlightedJoints: Set<BodyJointName> = [],
-        highlightedBones: Set<SkeletonBone> = [],
-        /// True while the coach is in pose-editing mode — skips the mannequin body wrapper so the
-        /// bare yellow joints/red bones are fully exposed and easy to grab, instead of being
-        /// partly buried inside the (visually larger) mannequin capsules.
-        hideMannequinBody: Bool = false
+        hideMannequinBody: Bool = false,
+        selectedJoint: BodyJointName? = nil,
+        draggedAxis: GizmoAxis? = nil
     ) -> Entity {
         let root = Entity()
         // Unlit (not affected by scene lighting) and bright, so the climber's body stays clearly
@@ -556,10 +560,6 @@ enum Video3DRealityKit {
         // coach is actually here to look at.
         let jointMaterial = UnlitMaterial(color: .systemYellow)
         let boneMaterial = UnlitMaterial(color: .systemRed)
-        // Distinct from every other color already in use (yellow joints, red bones, teal preset
-        // grips/feet, tan mannequin) so "this is about to move" reads unambiguously during a drag.
-        let highlightJointMaterial = UnlitMaterial(color: .systemGreen)
-        let highlightBoneMaterial = UnlitMaterial(color: .systemGreen)
         var mannequinMaterial = SimpleMaterial(color: UIColor(red: 0.86, green: 0.71, blue: 0.6, alpha: 0.92), roughness: 0.7, isMetallic: false)
         mannequinMaterial.faceCulling = .none
 
@@ -591,11 +591,10 @@ enum Video3DRealityKit {
         }
 
         for (joint, position) in worldPositions {
-            let isHighlighted = highlightedJoints.contains(joint)
-            // Slightly larger when highlighted — both a clearer visual cue and a bigger hit
-            // target for the joint that's actively being dragged.
-            let radius: Float = isHighlighted ? 0.045 : 0.035
-            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [isHighlighted ? highlightJointMaterial : jointMaterial])
+            let isBeingDragged = (joint == selectedJoint) && (draggedAxis != nil)
+            let material = UnlitMaterial(color: isBeingDragged ? draggedAxis!.color : .systemYellow)
+            let radius: Float = 0.035
+            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [jointMaterial])
             sphere.position = position
             sphere.name = jointEntityName(for: joint)
             // REQUIRED for `ARView.entity(at:)` (used by the Edit Pose drag gesture) to ever hit
@@ -609,10 +608,14 @@ enum Video3DRealityKit {
 
         for bone in skeletonBones {
             guard let a = worldPositions[bone.from], let b = worldPositions[bone.to] else { continue }
-            let isHighlighted = highlightedBones.contains(bone)
-            let radius: Float = isHighlighted ? 0.022 : 0.016
-            if let boneEntity = cylinderBetween(a, b, radius: radius, material: isHighlighted ? highlightBoneMaterial : boneMaterial) {
+            let radius: Float = 0.016
+            if let boneEntity = cylinderBetween(a, b, radius: radius, material: boneMaterial) {
                 root.addChild(boneEntity)
+            }
+        }
+        if let selectedJoint, let origin = worldPositions[selectedJoint] {
+            for arrow in axisGizmoEntities(at: origin, handleLength: 0.2, activeAxis: draggedAxis) {
+                root.addChild(arrow)
             }
         }
 
@@ -686,6 +689,38 @@ enum Video3DRealityKit {
             entity.orientation = simd_quatf(angle: angle, axis: axis)
         }
         return entity
+    }
+    
+    private static func axisGizmoEntities(at origin: SIMD3<Float>, handleLength: Float, activeAxis: GizmoAxis?) -> [Entity] {
+        let coneHeight: Float = 0.03
+        let coneRadius: Float = 0.012
+        let shaftRadius: Float = 0.006
+
+        return GizmoAxis.allCases.flatMap { axis -> [Entity] in
+            let material = UnlitMaterial(color: axis.color)
+            let shaftEnd = origin + axis.worldDirection * (handleLength - coneHeight)
+            let coneCenter = shaftEnd + axis.worldDirection * (coneHeight / 2)
+
+            var entities: [Entity] = []
+            if let shaft = cylinderBetween(origin, shaftEnd, radius: shaftRadius, material: material) {
+                entities.append(shaft)
+            }
+
+            let cone = ModelEntity(mesh: .generateCone(height: coneHeight, radius: coneRadius), materials: [material])
+            cone.position = coneCenter
+            // generateCone points along +Y by default, same convention cylinderBetween already
+            // rotates onto — reuse that same up-onto-direction rotation here.
+            let up = SIMD3<Float>(0, 1, 0)
+            let dot = simd_dot(up, axis.worldDirection)
+            if dot < -0.9999 {
+                cone.orientation = simd_quatf(angle: .pi, axis: SIMD3<Float>(1, 0, 0))
+            } else if dot < 0.9999 {
+                let rotAxis = normalize(simd_cross(up, axis.worldDirection))
+                cone.orientation = simd_quatf(angle: acos(dot), axis: rotAxis)
+            }
+            entities.append(cone)
+            return entities
+        }
     }
 }
 
