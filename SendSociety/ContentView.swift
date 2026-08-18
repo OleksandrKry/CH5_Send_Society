@@ -18,42 +18,30 @@ struct ContentView: View {
     @State private var routeGrade: RouteGrade?
     @State private var selectedClimber: Climber?
     
+    let initialRouteGrade: RouteGrade?
+    let initialClimber: Climber?
+    
     var onFinished: () -> Void = {}
 
     var body: some View {
         Group {
-            if !LiDARSupport.isSupported {
-                unsupportedDeviceView
-            } else if routeGrade == nil || selectedClimber == nil {
-                if let sessionController {
-                    let existingClimbers = sessionController.fetchAllClimbers()
-                    let mostRecent = sessionController.mostRecentVideoAttempt()
-                    let defaultClimber = mostRecent?.climberID.flatMap { id in
-                        existingClimbers.first { $0.id == id }
-                    }
-                    RecordingClimberView(
-                        existingClimbers: existingClimbers,
-                        initialRouteGrade: mostRecent?.routeGrade ?? .v0,
-                        initialClimber: defaultClimber,
-                        onStart: { grade, climber in
-                            routeGrade = grade
-                            selectedClimber = climber
-                        },
-                        onCancel: onFinished,
-                        createClimber: { name in try sessionController.createClimber(name: name) }
-                    )
-                } else {
-                    ProgressView()
-                }
-            } else {
-                recordingScreen
-            }
-        }
-        .onAppear {
-            if sessionController == nil {
-                sessionController = SessionStoreV2(modelContext: modelContext)
-            }
-        }
+               if !LiDARSupport.isSupported {
+                   unsupportedDeviceView
+               } else {
+                   recordingScreen
+               }
+           }
+           .onAppear {
+               if sessionController == nil {
+                   sessionController = SessionStoreV2(
+                       modelContext: modelContext
+                   )
+               }
+
+               routeGrade = initialRouteGrade
+               selectedClimber = initialClimber
+           }
+        
         .alert(
             "Couldn't Save Recording",
             isPresented: Binding(

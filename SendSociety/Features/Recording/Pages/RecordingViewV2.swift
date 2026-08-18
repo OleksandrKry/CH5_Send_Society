@@ -83,7 +83,7 @@ struct RecordingViewV2: View {
     private var recordingCameraArea: some View {
         ZStack {
             // MARK: Background
-            Color(.tertiaryDark)
+            Color(AppColor.TertiaryDark)
                 .ignoresSafeArea()
             ARMeshSceneView(session: arManager.session, showMesh: false)
                 .ignoresSafeArea()
