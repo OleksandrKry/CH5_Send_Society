@@ -14,6 +14,7 @@ struct PlaybackOverlay: View {
     
     @Binding var isPlaying: Bool
     @Binding var playbackRate: Double
+    @State private var isClimbingAnnotationOpen = false
     
     // MARK: - initialize VideoMarker data
     
@@ -31,34 +32,34 @@ struct PlaybackOverlay: View {
             // MARK: Hand Tool
             
             Button {
-                // Hand tool action
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isClimbingAnnotationOpen.toggle()
+                }
             } label: {
-                Image(systemName: "hand.raised")
-                    .font(.title)
-                    .foregroundStyle(.primaryDark)
-                    .frame(
-                        width: 72,
-                        height: 72
-                    )
-                    .background(
-                        .primaryLightLessOpacity
-                    )
-                    .clipShape(Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                .white.opacity(0.8),
-                                lineWidth: 1
-                            )
-                    }
-                    .shadow(
-                        color: .black.opacity(0.15),
-                        radius: 6,
-                        y: 2
-                    )
+                Image(
+                    systemName: isClimbingAnnotationOpen
+                    ? "chevron.down"
+                    : "hand.raised"
+                )
+                .font(.title)
+                .foregroundStyle(.primaryDark)
+                .frame(width: 72, height: 72)
+                .background(.primaryLightLessOpacity)
+                .clipShape(Circle())
+                .overlay {
+                    Circle()
+                        .stroke(
+                            .white.opacity(0.8),
+                            lineWidth: 1
+                        )
+                }
+                .shadow(
+                    color: .black.opacity(0.15),
+                    radius: 6,
+                    y: 2
+                )
             }
             .offset(y: -32)
-
             
             Spacer()
             

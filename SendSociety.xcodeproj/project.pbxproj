@@ -12,6 +12,7 @@
 		2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC3371247FC4A41A1F41C0F /* LibraryView.swift */; };
 		346E888023EFF2C93B268470 /* JointDragProjector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901F77D623A462E5F44D0125 /* JointDragProjector.swift */; };
 		384F9F216209C9E2C51394F9 /* PlaybackModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9680E2037EF0E5336B5BACA6 /* PlaybackModel.swift */; };
+		430BD3593034451200BC92EC /* Skeleton3DDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 430BD358303444FB00BC92EC /* Skeleton3DDesign.swift */; };
 		4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB6192C006A4D5AAC83C296 /* UserIdentity.swift */; };
 		5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = D861829D58114A9AADE83B96 /* DebugLog.swift */; };
 		5BE800B626F1829814106523 /* PersonPresenceDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBC944814DE1B8BBD1B61C42 /* PersonPresenceDetector.swift */; };
@@ -71,6 +72,7 @@
 		27E4A34523354A76B854D9EF /* SendSociety.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SendSociety.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMeshSceneView.swift; sourceTree = "<group>"; };
 		42BF999F98834402830605C8 /* EnumModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnumModels.swift; sourceTree = "<group>"; };
+		430BD358303444FB00BC92EC /* Skeleton3DDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Skeleton3DDesign.swift; sourceTree = "<group>"; };
 		4627689E22B94DEBB591BB78 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5ABB3C7555213BF17F8CE38E /* PlaybackEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEngine.swift; sourceTree = "<group>"; };
 		6851B749302EE57400940510 /* PlaybackViewV2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackViewV2.swift; sourceTree = "<group>"; };
@@ -179,6 +181,7 @@
 		358F98F5A91CBC675D091BA1 /* Pages */ = {
 			isa = PBXGroup;
 			children = (
+				430BD358303444FB00BC92EC /* Skeleton3DDesign.swift */,
 				6851B784303089DA00940510 /* Skeleton3DView.swift */,
 				6851B77E3030575F00940510 /* Generate3DEngine.swift */,
 			);
@@ -487,6 +490,7 @@
 				6851B7993031D97E00940510 /* OfflinePlaybackLayer.swift in Sources */,
 				2F6E44EBB24449EDA0D45D5A /* LibraryView.swift in Sources */,
 				DC9F38EBD4AEF3CFF2222AA4 /* LibraryEngine.swift in Sources */,
+				430BD3593034451200BC92EC /* Skeleton3DDesign.swift in Sources */,
 				6851B74A302EE58100940510 /* PlaybackViewV2.swift in Sources */,
 				6851B7B63032B9CF00940510 /* RouteGrade.swift in Sources */,
 				6851B765302F50A500940510 /* RecordingViewV2.swift in Sources */,
@@ -624,7 +628,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = 2LRF7RJ5XQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -652,7 +656,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 6782G2M9AF;
+				DEVELOPMENT_TEAM = 2LRF7RJ5XQ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

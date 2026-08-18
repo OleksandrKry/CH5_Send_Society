@@ -29,6 +29,7 @@ struct PlaybackViewV2: View {
 //    @State private var duration: Double = 75
 //    @State private var isPlaying = false
     @State private var playbackRate: Double = 1
+
     
     // MARK: - The "brains" this screen talks to
 
