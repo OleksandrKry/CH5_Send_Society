@@ -15,6 +15,7 @@ struct OfflinePlaybackView: View {
     // MARK: - Given to this screen from outside
 
     let videoURL: URL
+    let videoAttempt: VideoAttemptV2
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
     let onGenerate: (URL, TimeInterval) -> Void
@@ -43,9 +44,11 @@ struct OfflinePlaybackView: View {
     /// The video timestamp `drawingState` currently belongs to.
     @State private var currentDrawingVideoTime: Double = 0
     @State private var isUserDrawing: Bool = false
+    @State private var climberName: String?
 
     init(
         url: URL,
+        videoAttempt: VideoAttemptV2,
         recordingSession: RecordingSessionV2?,
         sessionController: SessionStoreV2?,
         initialVideoAnnotations: [VideoAnnotationEntry] = [],
@@ -56,6 +59,7 @@ struct OfflinePlaybackView: View {
         onGenerate: @escaping (URL, TimeInterval) -> Void
     ) {
         self.videoURL = url
+        self.videoAttempt = videoAttempt
         self.recordingSession = recordingSession
         self.sessionController = sessionController
         self.onDismiss = onDismiss
@@ -111,21 +115,21 @@ struct OfflinePlaybackView: View {
             
             ZStack (alignment: .topLeading) {
 
-                VideoPlayer(player: videoModel.player)
+                SilentVideoPlayer(player: videoModel.player)
                     .ignoresSafeArea()
                 if isUserDrawing {
                     AnnotationComponent(annotationState: annotationState)
                 } else if !videoModel.isPlaying, !annotationState.strokes.isEmpty {
                     AnnotationComponent(annotationState: annotationState, isInteractive: false)
                 }
-                ClimbInfoCard()
-                    .padding(.top, 16)
-                    .padding(.leading, 16)
+//                ClimbInfoCard()
+//                    .padding(.top, 16)
+//                    .padding(.leading, 16)
             }
-            .overlay(alignment: .topTrailing) {
+            .overlay(alignment: .bottomTrailing) {
                 AnnotateToolbar(annotationState: annotationState, isUserDrawing: $isUserDrawing)
-                .padding(.top, 120)
-                .padding(.trailing, 24)
+                .padding(.bottom, 70)
+                .padding(.trailing, 70)
             }
             
             .overlay(alignment: .bottom) {
@@ -139,11 +143,17 @@ struct OfflinePlaybackView: View {
                         onGenerate3D: { onGenerate(videoURL, videoModel.currentTime) }
                    )
             }
-            
-            .navigationTitle("Climb at Bali Boulder")
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                        
+                ToolbarItem(placement: .principal) {
+                    VStack(spacing: 2) {
+                        Text("\(climberName ?? "Unknown Climber") - Grade \(videoAttempt.routeGrade.rawValue)")
+                            .font(.headline)
+                        Text("\(videoAttempt.createdAt.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                    }
+                }
                 // LEFT
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
@@ -171,7 +181,7 @@ struct OfflinePlaybackView: View {
                     Button {
                         // More action
                     } label: {
-                        Image(systemName: "ellipsis")
+                        Image(systemName: "questionmark")
                     }
                     
 //                    Button {
@@ -182,6 +192,9 @@ struct OfflinePlaybackView: View {
                 }
             }
             .onAppear {
+                climberName = videoAttempt.climberID.flatMap { id in
+                    sessionController?.fetchAllClimbers().first(where: { $0.id == id })?.name
+                }
                 if let initialPlaybackTimestamp {
                     videoModel.seek(to: initialPlaybackTimestamp)
                     currentDrawingVideoTime = initialPlaybackTimestamp
@@ -216,6 +229,7 @@ struct OfflinePlaybackView: View {
 #Preview {
     OfflinePlaybackView(
         url: FileManager.default.temporaryDirectory.appendingPathComponent("preview.mp4"),
+        videoAttempt: VideoAttemptV2(videoFileName: "preview.mp4", videoDurationSeconds: 30, routeGrade: .v5),
         recordingSession: nil,
         sessionController: nil
     ) { _, _ in }

@@ -114,21 +114,22 @@ struct PlaybackPanel: View {
                 
                 // MARK: Previous Frame
                 
-                Button {
-                    // Previous frame action
-                } label: {
-                    Image(systemName: "backward.frame")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.primaryDark)
-                        .frame(width: 48, height: 48)
-                        .background(.primaryLightLessOpacity)
-                        .clipShape(Circle())
-                        .shadow(
-                            color: .black.opacity(0.15),
-                            radius: 4,
-                            y: 2
-                        )
-                }
+//                Button {
+//                    // Previous frame action
+//                    currentTime = max(currentTime - 5, 0)
+//                } label: {
+//                    Image(systemName: "backward.frame")
+//                        .font(.system(size: 24))
+//                        .foregroundStyle(.primaryDark)
+//                        .frame(width: 48, height: 48)
+//                        .background(.primaryLightLessOpacity)
+//                        .clipShape(Circle())
+//                        .shadow(
+//                            color: .black.opacity(0.15),
+//                            radius: 4,
+//                            y: 2
+//                        )
+//                }
                 
                 // MARK: Play / Pause
                 
@@ -151,21 +152,22 @@ struct PlaybackPanel: View {
                 
                 // MARK: Next Frame
                 
-                Button {
-                    // Next frame action
-                } label: {
-                    Image(systemName: "forward.frame")
-                        .font(.system(size: 24))
-                        .foregroundStyle(.primaryDark)
-                        .frame(width: 48, height: 48)
-                        .background(.primaryLightLessOpacity)
-                        .clipShape(Circle())
-                        .shadow(
-                            color: .black.opacity(0.15),
-                            radius: 4,
-                            y: 2
-                        )
-                }
+//                Button {
+//                    // Next frame action
+//                    currentTime = min(currentTime + 5, duration)
+//                } label: {
+//                    Image(systemName: "forward.frame")
+//                        .font(.system(size: 24))
+//                        .foregroundStyle(.primaryDark)
+//                        .frame(width: 48, height: 48)
+//                        .background(.primaryLightLessOpacity)
+//                        .clipShape(Circle())
+//                        .shadow(
+//                            color: .black.opacity(0.15),
+//                            radius: 4,
+//                            y: 2
+//                        )
+//                }
                 
                 Spacer()
                 

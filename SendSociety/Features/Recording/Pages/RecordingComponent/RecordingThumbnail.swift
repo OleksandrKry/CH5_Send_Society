@@ -14,37 +14,76 @@ struct RecordingThumbnail: View {
     @Binding var selectedAttempt: VideoAttemptV2?
     
     let sessionController: SessionStoreV2?
+    let recordingSession: RecordingSessionV2?
     @State private var thumbnails: [UUID: CGImage] = [:]
+    @State private var attemptPendingDeletion: VideoAttemptV2?
 
     var body: some View {
         if !videoAttempts.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(videoAttempts) { attempt in
-                        thumbnailButton(for: attempt)
+                    ForEach(Array(videoAttempts.enumerated()), id: \.element.id) { index, attempt in
+                        thumbnailButton(for: attempt, index: index)
                     }
                 }
                 .padding(.horizontal, 24)
             }
+            .confirmationDialog(
+                "Delete this recording?",
+                isPresented: Binding(
+                    get: { attemptPendingDeletion != nil },
+                    set: { isPresented in if !isPresented { attemptPendingDeletion = nil } }
+                ),
+                presenting: attemptPendingDeletion
+            ) { attempt in
+                Button("Delete", role: .destructive) { delete(attempt) }
+                Button("Cancel", role: .cancel) {}
+            } message: { _ in
+                Text("This removes the recording and its video file. This can't be undone.")
+            }
         }
     }
 
-    private func thumbnailButton(for attempt: VideoAttemptV2) -> some View {
-        Button {
-            selectedAttempt = attempt
-        } label: {
-            thumbnailImage(for: attempt)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 172, height: 154)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(.white, lineWidth: selectedAttempt?.id == attempt.id ? 3 : 0)
-                        )
+    private func thumbnailButton(for attempt: VideoAttemptV2, index: Int) -> some View {
+        let size: CGFloat = 120
+
+        return ZStack {
+            Button {
+                selectedAttempt = attempt
+            } label: {
+                thumbnailImage(for: attempt)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: size, height: size)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(.white, lineWidth: selectedAttempt?.id == attempt.id ? 3 : 0)
+                    )
+            }
+            .buttonStyle(.plain)
+
+            Button {
+                attemptPendingDeletion = attempt
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.caption.bold())
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(.red, in: Circle())
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+
+            Text("\(index + 1)")
+                .font(.caption.bold())
+                .foregroundStyle(.primaryDark)
+                .frame(width: 24, height: 24)
+                .background(.ultraThinMaterial, in: Circle())
+                .padding(6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
-        .buttonStyle(.plain)
-        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 10))
+        .frame(width: size, height: size)
         .task(id: attempt.id) {
             await loadThumbnailIfNeeded(for: attempt)
         }
@@ -64,6 +103,13 @@ struct RecordingThumbnail: View {
         }.value
         if let firstFrame {
             thumbnails[attempt.id] = firstFrame
+        }
+    }
+    private func delete(_ attempt: VideoAttemptV2) {
+        guard let sessionController, let recordingSession else { return }
+        sessionController.removeVideoAttempt(attempt.id, from: recordingSession)
+        if selectedAttempt?.id == attempt.id {
+            selectedAttempt = nil
         }
     }
 }
