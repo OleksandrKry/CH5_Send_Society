@@ -19,6 +19,7 @@ struct PlaybackOverlay: View {
     
     let videoMarkerList: [VideoMarkerModel]
     let onVideoMarkerClick: (VideoMarkerModel) -> Void
+    @State private var isClimbingAnnotationOpen = false
     
     let onGenerate3D: () -> Void
     
@@ -32,6 +33,9 @@ struct PlaybackOverlay: View {
             
             Button {
                 // Hand tool action
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isClimbingAnnotationOpen.toggle()
+                }
             } label: {
                 Image(systemName: "hand.raised")
                     .font(.title)
@@ -98,6 +102,23 @@ struct PlaybackOverlay: View {
         }
         .padding(.horizontal, 64)
         .padding(.bottom, 32)
+        .overlay(alignment: .bottomLeading) {
+                    
+            if isClimbingAnnotationOpen {
+                ClimbingAnnotation()
+                    .offset(
+                        x: 20,
+                        y: -160
+                    )
+                    .transition(
+                        .scale(
+                            scale: 0.95,
+                            anchor: .bottom
+                        )
+                        .combined(with: .opacity)
+                    )
+            }
+        }
     }
 }
 
