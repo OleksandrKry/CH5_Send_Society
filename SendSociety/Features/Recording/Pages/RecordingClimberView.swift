@@ -72,8 +72,10 @@ struct RecordingClimberView: View {
                         }
                     }
 
-                    TextField("Climber name", text: $climberName)
-                        .disabled(!isNewClimber)
+                    if isNewClimber{
+                        TextField("Climber name", text: $climberName)
+                            .disabled(!isNewClimber)
+                    }
 
                     if let errorMessage {
                         Text(errorMessage)
@@ -83,14 +85,11 @@ struct RecordingClimberView: View {
                 }
             }
             .scrollDisabled(true)
-//            .navigationTitle("New Recording")
+            .navigationTitle("New Recording")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel", action: onCancel)
-                }
-                ToolbarItem(placement: .principal) {
-                    Text("New Recording")
-                        .font(.headline)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start", action: start)
