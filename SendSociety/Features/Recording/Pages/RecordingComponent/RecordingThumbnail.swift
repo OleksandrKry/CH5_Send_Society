@@ -20,27 +20,15 @@ struct RecordingThumbnail: View {
 
     var body: some View {
         if !videoAttempts.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 12) {
                     ForEach(Array(videoAttempts.enumerated()), id: \.element.id) { index, attempt in
                         thumbnailButton(for: attempt, index: index)
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.vertical, 24)
             }
-            .confirmationDialog(
-                "Delete this recording?",
-                isPresented: Binding(
-                    get: { attemptPendingDeletion != nil },
-                    set: { isPresented in if !isPresented { attemptPendingDeletion = nil } }
-                ),
-                presenting: attemptPendingDeletion
-            ) { attempt in
-                Button("Delete", role: .destructive) { delete(attempt) }
-                Button("Cancel", role: .cancel) {}
-            } message: { _ in
-                Text("This removes the recording and its video file. This can't be undone.")
-            }
+            
         }
     }
 
@@ -74,7 +62,18 @@ struct RecordingThumbnail: View {
             }
             .padding(6)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-
+            .confirmationDialog(
+                "Delete this recording?",
+                isPresented: Binding(
+                    get: { attemptPendingDeletion?.id == attempt.id },
+                    set: { isPresented in if !isPresented { attemptPendingDeletion = nil } }
+                )
+            ) {
+                Button("Delete", role: .destructive) { delete(attempt) }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the recording and its video file. This can't be undone.")
+            }
             Text("\(index + 1)")
                 .font(.caption.bold())
                 .foregroundStyle(.primaryDark)

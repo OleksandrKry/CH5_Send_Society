@@ -17,6 +17,7 @@ struct RecordingViewV2: View {
     @State private var recordingTimer: Date?
 
     @StateObject private var engine: RecordingEngineV2
+    @State private var isConfirmingEndSession = false
 
     init(arManager: ARSessionManager, recorder: VideoRecorderEngine, recordedURL: Binding<URL?>, recordingSession: RecordingSessionV2?, sessionController: SessionStoreV2?, onSessionDone: @escaping () -> Void) {
         self.arManager = arManager
@@ -35,22 +36,6 @@ struct RecordingViewV2: View {
                 .animation(.easeInOut(duration: 0.25), value: videoAttempt == nil)
 
             recordingThumbnailArea
-
-            if let videoAttempt, let sessionController {
-                PlaybackLayerV2(
-                    arManager: arManager,
-                    videoURL: sessionController.videoURL(for: videoAttempt),
-                    videoAttempt: videoAttempt,
-                    frameStore: recorder.frameStore,
-                    recordingSession: recordingSession,
-                    sessionController: sessionController,
-                    onDismiss: { self.videoAttempt = nil }
-                )
-                .id(videoAttempt.id)
-                .padding(.bottom, 220)
-                .transition(.opacity)
-                .zIndex(1)
-            }
         }
         .onAppear {
             arManager.startIfNeeded()
@@ -71,14 +56,34 @@ struct RecordingViewV2: View {
             }
         }
 //        testing if fullscreen
-//        .fullScreenCover(item: $reviewingAttempt) { attempt in
-//            if let sessionController {
-//                PlaybackLayerV2(
-//                    videoURL: sessionController.videoURL(for: attempt),
-//                    frameStore: recorder.frameStore
-//                )
-//            }
-//        }
+        .fullScreenCover(item: $videoAttempt) { attempt in
+            if let sessionController {
+                PlaybackLayerV2(
+                    arManager: arManager,
+                    videoURL: sessionController.videoURL(for: attempt),
+                    videoAttempt: attempt,
+                    videoAttempts: recordingSession?.videoAttempts ?? [],
+                    selectedAttempt: $videoAttempt,
+                    frameStore: recorder.frameStore,
+                    recordingSession: recordingSession,
+                    sessionController: sessionController,
+                    onDismiss: { self.videoAttempt = nil }
+                )
+                .id(attempt.id)
+            }
+        }
+        .confirmationDialog(
+            "End this session?",
+            isPresented: $isConfirmingEndSession,
+            titleVisibility: .visible
+        ) {
+            Button("End Session", role: .destructive) {
+                onSessionDone()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will stop recording and close the session.")
+        }
     }
 
     private var recordingCameraArea: some View {
@@ -122,15 +127,15 @@ struct RecordingViewV2: View {
 
             // MARK: Left Control
             HStack {
-                Button {
-                    // Person / subject action
-                } label: {
-                    Image(systemName: "person")
-                        .font(.title3)
-                        .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular, in: Circle())
+//                Button {
+//                    // Person / subject action
+//                } label: {
+//                    Image(systemName: "person")
+//                        .font(.title3)
+//                        .frame(width: 56, height: 56)
+//                }
+//                .buttonStyle(.plain)
+//                .glassEffect(.regular, in: Circle())
 
                 Spacer()
             }
@@ -199,7 +204,8 @@ struct RecordingViewV2: View {
                 HStack {
                     Spacer()
                     Button("End Session") {
-                        onSessionDone()
+                        
+                        isConfirmingEndSession = true
                         // Close recording
                     }
                     .buttonStyle(.glass)
@@ -211,12 +217,15 @@ struct RecordingViewV2: View {
     }
 
     private var recordingThumbnailArea: some View {
-        VStack {
-            Spacer()
+        HStack {
             RecordingThumbnail(videoAttempts: recordingSession?.videoAttempts ?? [], selectedAttempt: $videoAttempt, sessionController: sessionController, recordingSession: recordingSession)
+                .frame(maxHeight: 800)
+            
+            Spacer()
         }
-        .padding(.bottom, 20)
-        .padding(.trailing, 200)
+        .padding(.leading, 24)
+        .padding(.top, 100)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     private var recordButtonIsDisabled: Bool {
         !recorder.isRecording && arManager.isRunning && !engine.isReadyToRecord
