@@ -54,39 +54,65 @@ struct LibraryView: View {
                         }
                     }
                 }
-                .navigationTitle("Send Society")
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button {
-                            showClimberPicker = true
-                        } label: {
-                            Label(
-                                "New Recording",
-                                systemImage: "plus.circle.fill"
-                            )
+                .navigationTitle("GetBeta")
+//                .toolbar {
+//                    ToolbarItem(placement: .primaryAction) {
+//                        Button {
+//                            showClimberPicker = true
+//                        } label: {
+//                            Label(
+//                                "New Recording",
+//                                systemImage: "plus.circle.fill"
+//                            )
+//                        }
+//                    }
+//                }
+            }
+//            .searchable(
+//                text: $searchText,
+//                prompt: "Search recordings"
+//            )
+            
+            // MARK: - Record Button
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        showClimberPicker = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(.red)
+                                .frame(width: 64, height: 64)
+                                .shadow(
+                                    color: .black.opacity(0.2),
+                                    radius: 4,
+                                    x: 0,
+                                    y: 4
+                                )
+
+                            Image(systemName: "video.fill")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(.white)
                         }
                     }
+                    .padding(.trailing, 40)
                 }
+                .padding(.bottom, 15)
             }
-            .searchable(
-                text: $searchText,
-                prompt: "Search recordings"
-            )
-
+            
             // MARK: Climber / Grade Popup
-
             if showClimberPicker {
                 Color.black
                     .opacity(0.35)
                     .ignoresSafeArea()
-
                 climberPickerPopup
             }
         }
         .onAppear(perform: setUpIfNeeded)
 
         // MARK: Fullscreen Recording
-
         .fullScreenCover(
             isPresented: $isPresentingNewRecording,
             onDismiss: reloadItems
@@ -164,7 +190,8 @@ struct LibraryView: View {
                     )
                 }
             )
-            .frame(width: 420, height: 400)
+            
+            .frame(width: 420, height: 330)
             .background(.regularMaterial)
             .clipShape(
                 RoundedRectangle(cornerRadius: 24)
@@ -178,20 +205,57 @@ struct LibraryView: View {
         }
     }
 
+//    private var itemList: some View {
+//        List {
+//            ForEach(filteredItems) { item in
+//                Button {
+//                    reviewingItem = item
+//                } label: {
+//                    LibraryRow(item: item)
+//                }
+//                .buttonStyle(.plain)
+//            }
+//            .onDelete(perform: deleteItems)
+//        }
+//        .listStyle(.plain)
+//    }
+    
+    //MARK: ItemList Edited + deleteItem Functions
+    private func deleteItem(_ item: LibraryEngine.Item) {
+        guard let index = filteredItems.firstIndex(where: { $0.id == item.id }) else {
+            return
+        }
+        deleteItems(at: IndexSet(integer: index))
+    }
 
     private var itemList: some View {
-        List {
-            ForEach(filteredItems) { item in
-                Button {
-                    reviewingItem = item
-                } label: {
-                    LibraryRow(item: item)
+        ScrollView {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 16),
+                    count: 6
+                ),
+                spacing: 16
+            ) {
+                ForEach(filteredItems) { item in
+                    Button {
+                        reviewingItem = item
+                    } label: {
+                        LibraryRow(item: item, sessionController: sessionController)
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            deleteItem(item)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
             }
-            .onDelete(perform: deleteItems)
+            .padding(.horizontal)
+            .padding(.vertical, 12)
         }
-        .listStyle(.plain)
     }
 
     private var emptyStateView: some View {
