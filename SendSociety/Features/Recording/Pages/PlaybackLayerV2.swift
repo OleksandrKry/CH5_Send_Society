@@ -17,6 +17,8 @@ struct PlaybackLayerV2: View {
     let arManager: ARSessionManager
     let videoURL: URL
     let videoAttempt: VideoAttemptV2
+    let videoAttempts: [VideoAttemptV2]
+    @Binding var selectedAttempt: VideoAttemptV2?
     let frameStore: ARFrameStore
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
@@ -63,6 +65,8 @@ struct PlaybackLayerV2: View {
                     url: videoURL,
                     frameStore: frameStore,
                     videoAttempt: videoAttempt,
+                    videoAttempts: videoAttempts,
+                    selectedAttempt: $selectedAttempt,
                     recordingSession: recordingSession,
                     sessionController: sessionController,
                     initialVideoAnnotations: videoAnnotations,

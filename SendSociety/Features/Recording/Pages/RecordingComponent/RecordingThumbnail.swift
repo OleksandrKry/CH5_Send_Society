@@ -20,13 +20,13 @@ struct RecordingThumbnail: View {
 
     var body: some View {
         if !videoAttempts.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 12) {
                     ForEach(Array(videoAttempts.enumerated()), id: \.element.id) { index, attempt in
                         thumbnailButton(for: attempt, index: index)
                     }
                 }
-                .padding(.horizontal, 24)
+                .padding(.vertical, 24)
             }
             .confirmationDialog(
                 "Delete this recording?",

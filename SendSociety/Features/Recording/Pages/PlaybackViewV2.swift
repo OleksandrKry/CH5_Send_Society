@@ -16,6 +16,8 @@ struct PlaybackViewV2: View {
     let videoURL: URL
     let frameStore: ARFrameStore
     let videoAttempt: VideoAttemptV2
+    let videoAttempts: [VideoAttemptV2]
+    @Binding var selectedAttempt: VideoAttemptV2?
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
     let onGenerate: (URL, ARFrameStore, TimeInterval) -> Void
@@ -51,6 +53,8 @@ struct PlaybackViewV2: View {
         url: URL,
         frameStore: ARFrameStore,
         videoAttempt: VideoAttemptV2,
+        videoAttempts: [VideoAttemptV2],
+        selectedAttempt: Binding<VideoAttemptV2?>,
         recordingSession: RecordingSessionV2?,
         sessionController: SessionStoreV2?,
         initialVideoAnnotations: [VideoAnnotationEntry] = [],
@@ -63,6 +67,8 @@ struct PlaybackViewV2: View {
         self.videoURL = url
         self.frameStore = frameStore
         self.videoAttempt = videoAttempt
+        self.videoAttempts = videoAttempts
+        self._selectedAttempt = selectedAttempt
         self.recordingSession = recordingSession
         self.sessionController = sessionController
         self.onDismiss = onDismiss
@@ -145,6 +151,13 @@ struct PlaybackViewV2: View {
                         onVideoMarkerClick: goToVideoMarker,
                         onGenerate3D: { onGenerate(videoURL, frameStore, videoModel.currentTime) }
                    )
+            }
+            .overlay(alignment: .topLeading) {
+                RecordingThumbnail(videoAttempts: videoAttempts, selectedAttempt: $selectedAttempt, sessionController: sessionController, recordingSession: recordingSession)
+                    .frame(maxHeight: 700)
+                    .padding(.leading, 24)
+                    .padding(.top, 60)
+                
             }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
@@ -234,6 +247,8 @@ struct PlaybackViewV2: View {
         url: FileManager.default.temporaryDirectory.appendingPathComponent("preview.mp4"),
         frameStore: ARFrameStore(),
         videoAttempt: VideoAttemptV2(videoFileName: "preview.mp4", videoDurationSeconds: 30, routeGrade: .v5),
+        videoAttempts: [],
+        selectedAttempt: .constant(nil),
         recordingSession: nil,
         sessionController: nil
     ) { _, _, _ in }

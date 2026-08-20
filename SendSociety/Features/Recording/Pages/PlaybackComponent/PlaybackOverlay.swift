@@ -64,6 +64,7 @@ struct PlaybackOverlay: View {
 //            .offset(y: -32)
             Button {
                 onGenerate3D()
+                
             } label: {
                 Image("icon3DPose") // ganti sesuai nama asset PNG kamu di Assets.xcassets
                     .resizable()
