@@ -17,6 +17,7 @@ struct RecordingViewV2: View {
     @State private var recordingTimer: Date?
 
     @StateObject private var engine: RecordingEngineV2
+    @State private var isConfirmingEndSession = false
 
     init(arManager: ARSessionManager, recorder: VideoRecorderEngine, recordedURL: Binding<URL?>, recordingSession: RecordingSessionV2?, sessionController: SessionStoreV2?, onSessionDone: @escaping () -> Void) {
         self.arManager = arManager
@@ -70,6 +71,18 @@ struct RecordingViewV2: View {
                 )
                 .id(attempt.id)
             }
+        }
+        .confirmationDialog(
+            "End this session?",
+            isPresented: $isConfirmingEndSession,
+            titleVisibility: .visible
+        ) {
+            Button("End Session", role: .destructive) {
+                onSessionDone()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will stop recording and close the session.")
         }
     }
 
@@ -191,7 +204,8 @@ struct RecordingViewV2: View {
                 HStack {
                     Spacer()
                     Button("End Session") {
-                        onSessionDone()
+                        
+                        isConfirmingEndSession = true
                         // Close recording
                     }
                     .buttonStyle(.glass)
