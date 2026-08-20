@@ -118,9 +118,12 @@ struct Skeleton3DView: View {
             headerPanel
         }
         .overlay(alignment: .bottomTrailing) {
-            AnnotateToolbar(annotationState: annotationState, isUserDrawing: isUserDrawingBinding)
-            .padding(.bottom, 70)
-            .padding(.trailing, 70)
+            if (interactionMode != .editPose) {
+                AnnotateToolbar(annotationState: annotationState, isUserDrawing: isUserDrawingBinding)
+                .padding(.bottom, 70)
+                .padding(.trailing, 70)
+            }
+            
         }
         .onAppear {
             if !initialAnnotationStrokes.isEmpty {
