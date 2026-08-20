@@ -14,6 +14,7 @@ struct RecordingViewV2: View {
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
     let onSessionDone: () -> Void   // NEW
+    @State private var recordingTimer: Date?
 
     @StateObject private var engine: RecordingEngineV2
 
@@ -90,12 +91,22 @@ struct RecordingViewV2: View {
 
             // MARK: Recording Timer
             VStack(spacing: 8) {
-                Text("00:00:00")
-                    .font(.title2)
-                    .monospacedDigit()
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .glassEffect(.regular, in: Capsule())
+//                Text("00:00:00")
+//                    .font(.title2)
+//                    .monospacedDigit()
+//                    .padding(.horizontal, 20)
+//                    .padding(.vertical, 12)
+//                    .glassEffect(.regular, in: Capsule())
+                
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(formattedElapsed(context.date))
+                        .font(.title2)
+                        .monospacedDigit()
+                        .foregroundStyle(recorder.isRecording ? .red : .primary)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .glassEffect(.regular, in: Capsule())
+                }
 
                 if let guidanceMessage {
                     Text(guidanceMessage)
@@ -127,39 +138,39 @@ struct RecordingViewV2: View {
 
             // MARK: Right Controls
             VStack(spacing: 16) {
-                Button {
-                    // Resolution
-                } label: {
-                    VStack(spacing: 0) {
-                        Text("HD").font(.body)
-                        Text("RES").font(.caption2)
-                    }
-                    .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular, in: Circle())
-
-                Button {
-                    // Frame rate
-                } label: {
-                    VStack(spacing: 0) {
-                        Text("30").font(.body)
-                        Text("FPS").font(.caption2)
-                    }
-                    .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular, in: Circle())
-
-                Button {
-                    // Audio
-                } label: {
-                    Image(systemName: "speaker.wave.2.fill")
-                        .font(.title3)
-                        .frame(width: 56, height: 56)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(.regular, in: Circle())
+//                Button {
+//                    // Resolution
+//                } label: {
+//                    VStack(spacing: 0) {
+//                        Text("HD").font(.body)
+//                        Text("RES").font(.caption2)
+//                    }
+//                    .frame(width: 56, height: 56)
+//                }
+//                .buttonStyle(.plain)
+//                .glassEffect(.regular, in: Circle())
+//
+//                Button {
+//                    // Frame rate
+//                } label: {
+//                    VStack(spacing: 0) {
+//                        Text("30").font(.body)
+//                        Text("FPS").font(.caption2)
+//                    }
+//                    .frame(width: 56, height: 56)
+//                }
+//                .buttonStyle(.plain)
+//                .glassEffect(.regular, in: Circle())
+//
+//                Button {
+//                    // Audio
+//                } label: {
+//                    Image(systemName: "speaker.wave.2.fill")
+//                        .font(.title3)
+//                        .frame(width: 56, height: 56)
+//                }
+//                .buttonStyle(.plain)
+//                .glassEffect(.regular, in: Circle())
 
                 Button {
                     toggleRecording()
@@ -202,7 +213,7 @@ struct RecordingViewV2: View {
     private var recordingThumbnailArea: some View {
         VStack {
             Spacer()
-            RecordingThumbnail(videoAttempts: recordingSession?.videoAttempts ?? [], selectedAttempt: $videoAttempt, sessionController: sessionController)
+            RecordingThumbnail(videoAttempts: recordingSession?.videoAttempts ?? [], selectedAttempt: $videoAttempt, sessionController: sessionController, recordingSession: recordingSession)
         }
         .padding(.bottom, 20)
         .padding(.trailing, 200)
@@ -223,6 +234,7 @@ struct RecordingViewV2: View {
             engine.attemptWallMeshSave()
             engine.markRecordingStarted()
             recorder.startRecording()
+            recordingTimer = Date()
         }
     }
     private var guidanceMessage: String? {
@@ -254,6 +266,12 @@ struct RecordingViewV2: View {
     }
 
     @State private var videoAttempt: VideoAttemptV2?
+    
+    private func formattedElapsed(_ now: Date) -> String {
+        guard recorder.isRecording, let recordingTimer else { return "00:00:00" }
+        let total = Int(now.timeIntervalSince(recordingTimer))
+        return String(format: "%02d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
+    }
 }
 
 #Preview {

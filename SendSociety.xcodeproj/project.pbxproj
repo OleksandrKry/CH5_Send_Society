@@ -53,6 +53,7 @@
 		6851B7B83032BDC300940510 /* Climber.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B73032BDBF00940510 /* Climber.swift */; };
 		6851B7BA3032BE3700940510 /* ClimberStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B93032BE3300940510 /* ClimberStore.swift */; };
 		6851B7BC3032BF5000940510 /* RecordingClimberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7BB3032BF4400940510 /* RecordingClimberView.swift */; };
+		689F20E630361000001D0E71 /* SilentVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F20E530360FFB001D0E71 /* SilentVideoPlayer.swift */; };
 		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
 		75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */; };
 		7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */; };
@@ -117,6 +118,7 @@
 		6851B7B73032BDBF00940510 /* Climber.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Climber.swift; sourceTree = "<group>"; };
 		6851B7B93032BE3300940510 /* ClimberStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimberStore.swift; sourceTree = "<group>"; };
 		6851B7BB3032BF4400940510 /* RecordingClimberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingClimberView.swift; sourceTree = "<group>"; };
+		689F20E530360FFB001D0E71 /* SilentVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentVideoPlayer.swift; sourceTree = "<group>"; };
 		7A2EACC8906161F57BB8245E /* LibraryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEngine.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
 		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
@@ -182,6 +184,7 @@
 		2B883D25CF86451EA38202AA /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				689F20E530360FFB001D0E71 /* SilentVideoPlayer.swift */,
 				6851B7AA3032B2BD00940510 /* AnnotationComponent.swift */,
 				3702A0EF35964E97A7E1D492 /* ARMeshSceneView.swift */,
 				A616EBAFCA4445988B933BE9 /* MeshToggleButton.swift */,
@@ -507,6 +510,7 @@
 				6851B7933031D53F00940510 /* LibraryRow.swift in Sources */,
 				4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */,
 				6851B78130305BFE00940510 /* Video3DLidarModel.swift in Sources */,
+				689F20E630361000001D0E71 /* SilentVideoPlayer.swift in Sources */,
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
 				6851B7953031D58200940510 /* OfflinePlaybackView.swift in Sources */,
 				C97AA6126687468B83098033 /* WallScanArchive.swift in Sources */,
@@ -664,7 +668,10 @@
 				DEVELOPMENT_TEAM = 6782G2M9AF;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GetBeta;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Get Beta needs the camera to scan the climbing wall and record attempts.";
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -674,7 +681,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.climbcoach;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -692,7 +699,10 @@
 				DEVELOPMENT_TEAM = 6782G2M9AF;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = GetBeta;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.healthcare-fitness";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Get Beta needs the camera to scan the climbing wall and record attempts.";
+				INFOPLIST_KEY_UIRequiredDeviceCapabilities = arkit;
 				INFOPLIST_KEY_UIRequiresFullScreen = NO;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -702,7 +712,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.climbcoach;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

@@ -29,65 +29,26 @@ struct AnnotateToolbar: View {
     
     @Binding var isUserDrawing: Bool
     
+    
     var body: some View {
         VStack(spacing: 12) {
             
-            // MARK: Undo
             
-            Button {
-                // TODO: Undo action
-                annotationState.undo()
-            } label: {
-                Image(systemName: "arrow.uturn.backward")
-                    .font(.body)
-                    .foregroundStyle(.primaryDark)
-                    .frame(width: 48, height: 48)
-                    .background(.primaryLightLessOpacity)
-                    .clipShape(Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                .white.opacity(0.8),
-                                lineWidth: 1
-                            )
-                    }
-                    .shadow(
-                        color: .black.opacity(0.15),
-                        radius: 5,
-                        y: 2
-                    )
-            }
-            
-            // MARK: Eraser
-            
-            Button {
-                // TODO: Eraser action
-                annotationState.clear()
-            } label: {
-                Image(systemName: "trash")
-                    .font(.body)
-                    .foregroundStyle(.primaryDark)
-                    .frame(width: 48, height: 48)
-                    .background(.primaryLightLessOpacity)
-                    .clipShape(Circle())
-                    .overlay {
-                        Circle()
-                            .stroke(
-                                .white.opacity(0.8),
-                                lineWidth: 1
-                            )
-                    }
-                    .shadow(
-                        color: .black.opacity(0.15),
-                        radius: 5,
-                        y: 2
-                    )
-            }
             
             // MARK: Annotate + Panel
             
             VStack(spacing: 8) {
+                // Annotation Panel
                 
+                if isUserDrawing {
+                    AnnotationPanel(
+                        annotationState: annotationState
+                    )
+                    .transition(
+                        .scale(scale: 0.95)
+                        .combined(with: .opacity)
+                    )
+                }
                 // Pencil
                 
                 Button {
@@ -96,7 +57,7 @@ struct AnnotateToolbar: View {
                     }
                 } label: {
                     Image(systemName: isUserDrawing
-                          ? "chevron.up"
+                          ? "chevron.down"
                           : "pencil"
                           )
                         .font(.title2)
@@ -118,17 +79,7 @@ struct AnnotateToolbar: View {
                         )
                 }
                 
-                // Annotation Panel
                 
-                if isUserDrawing {
-                    AnnotationPanel(
-                        annotationState: annotationState
-                    )
-                    .transition(
-                        .scale(scale: 0.95)
-                        .combined(with: .opacity)
-                    )
-                }
             }
         }
     }
@@ -139,6 +90,10 @@ struct AnnotateToolbar: View {
 struct AnnotationPanel: View {
     
     @ObservedObject var annotationState: AnnotationState
+    
+    private var hasAnnotations: Bool {
+        !annotationState.strokes.isEmpty
+    }
     
     var body: some View {
         VStack(spacing: 4) {
@@ -190,6 +145,35 @@ struct AnnotationPanel: View {
                 icon: "textformat",
                 color: .primaryDark
             )
+            
+            // MARK: Undo
+            
+            Button {
+                // TODO: Undo action
+                annotationState.undo()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.body)
+                    .foregroundStyle(.primaryDark)
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!hasAnnotations)
+            .opacity(hasAnnotations ? 1 : 0.4)
+            
+            
+            // MARK: Eraser
+            
+            Button {
+                // TODO: Eraser action
+                annotationState.clear()
+            } label: {
+                Image(systemName: "trash")
+                    .font(.body)
+                    .foregroundStyle(.primaryDark)
+                    .frame(width: 44, height: 44)
+            }
+            .disabled(!hasAnnotations)
+            .opacity(hasAnnotations ? 1 : 0.4)
         }
         .padding(6)
         .background(.primaryLightLessOpacity)

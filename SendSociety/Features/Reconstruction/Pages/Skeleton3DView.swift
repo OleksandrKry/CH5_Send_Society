@@ -39,6 +39,7 @@ struct Skeleton3DView: View {
     /// Gates the destructive `onDelete` action behind a confirmation — deleting overwrites the
     /// saved JSON blob with no undo, so this always confirms rather than deleting on first tap.
     @State private var isConfirmingDelete = false
+    @State private var isConfirmingReset = false
     
     @State private var lastKnownSavedAnnotationStrokes: [AnnotationStrokeModel] = []
     
@@ -116,10 +117,10 @@ struct Skeleton3DView: View {
             }
             headerPanel
         }
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .bottomTrailing) {
             AnnotateToolbar(annotationState: annotationState, isUserDrawing: isUserDrawingBinding)
-                .padding(.top, 120)
-                .padding(.trailing, 24)
+            .padding(.bottom, 70)
+            .padding(.trailing, 70)
         }
         .onAppear {
             if !initialAnnotationStrokes.isEmpty {
@@ -148,6 +149,21 @@ struct Skeleton3DView: View {
         } message: {
             Text("This removes the saved 3D position for this moment so you can generate it again. This can't be undone.")
         }
+        .confirmationDialog(
+            "Reset this pose?",
+            isPresented: $isConfirmingReset,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) {
+                commitTrigger.commit?()
+                jointOverrides = nil
+                hasEditedPose = false
+                draggedJoint = nil
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This discards any manual joint corrections you've made and reverts to the auto-detected pose. This can't be undone.")
+        }
     }
 
     // MARK: - The 3D scene itself (wall + skeleton, orbit/pan/zoom, joint editing)
@@ -163,14 +179,14 @@ struct Skeleton3DView: View {
     private var headerPanel: some View {
         VStack(alignment: .leading, spacing: 4) {
             topButtonRow
-            Text("Step 4 — Static 3D Reconstruction").font(.headline)
-            if isApproximate {
-                approximatePlacementBanner
-            }
-            if let poseError {
-                noClimberDetectedBanner(poseError)
-            }
-            modeInstructions
+//            Text("Step 4 — Static 3D Reconstruction").font(.headline)
+//            if isApproximate {
+//                approximatePlacementBanner
+//            }
+//            if let poseError {
+//                noClimberDetectedBanner(poseError)
+//            }
+//            modeInstructions
         }
         .padding()
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
@@ -179,36 +195,43 @@ struct Skeleton3DView: View {
 
     private var topButtonRow: some View {
         HStack {
-            if let onBack {
-                Button {
-                    commitTrigger.commit?()
-                    onBack()
-                } label: {
-                    Label("Back to video", systemImage: "chevron.left")
+            if isEditingPose {
+                Spacer()
+                resetPoseButton
+                doneEditingPoseButton
+            } else {
+                if let onBack {
+                    Button {
+                        commitTrigger.commit?()
+                        onBack()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.bordered)
                 }
-                .buttonStyle(.bordered)
-            }
-            if let onFinished {
-                Button {
-                    commitTrigger.commit?()
-                    onFinished()
-                } label: {
-                    Label("Done", systemImage: "checkmark")
+                if onDelete != nil {
+                    Button(role: .destructive) {
+                        isConfirmingDelete = true
+                    } label: {
+                        Label("Delete Visualization", systemImage: "trash")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
                 }
-                .buttonStyle(.borderedProminent)
+                Spacer()
+                editPoseButton
             }
-            if onDelete != nil {
-                Button(role: .destructive) {
-                    isConfirmingDelete = true
-                } label: {
-                    Label("Delete", systemImage: "trash")
-                }
-                .buttonStyle(.bordered)
-                .tint(.red)
-            }
-            Spacer()
-            modeControls
         }
+    }
+    
+    private var doneEditingPoseButton: some View {
+        Button {
+            commitTrigger.commit?()
+            interactionMode = .camera
+        } label: {
+            Label("Done", systemImage: "checkmark")
+        }
+        .buttonStyle(.borderedProminent)
     }
 
     private var approximatePlacementBanner: some View {
@@ -257,24 +280,21 @@ struct Skeleton3DView: View {
     }
 
     private var resetPoseButton: some View {
-        Button("Reset Pose") {
-            jointOverrides = nil
-            hasEditedPose = false
-            draggedJoint = nil
+        Button {
+            isConfirmingReset = true
+        } label: {
+            Label("Reset Pose", systemImage: "arrow.trianglehead.2.counterclockwise.rotate.90")
         }
         .buttonStyle(.bordered)
-        .font(.footnote)
     }
 
     private var editPoseButton: some View {
         Button {
             interactionMode = .editPose
         } label: {
-            Label("Edit Pose", systemImage: "hand.draw")
+            Label("Edit Pose", systemImage: "move.3d")
         }
         .buttonStyle(.bordered)
-        .tint(interactionMode == .editPose ? .green : nil)
-        .font(.footnote)
     }
     
 }

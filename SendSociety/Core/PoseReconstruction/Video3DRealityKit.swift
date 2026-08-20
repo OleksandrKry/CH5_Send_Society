@@ -22,7 +22,7 @@ enum GizmoAxis: CaseIterable {
     }
     var color: UIColor {
         switch self {
-        case .x: return .systemRed
+        case .x: return .systemGreen
         case .y: return .systemBlue
         case .z: return .systemPurple
         }
@@ -594,7 +594,7 @@ enum Video3DRealityKit {
             let isBeingDragged = (joint == selectedJoint) && (draggedAxis != nil)
             let material = UnlitMaterial(color: isBeingDragged ? draggedAxis!.color : .systemYellow)
             let radius: Float = 0.035
-            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [jointMaterial])
+            let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
             sphere.position = position
             sphere.name = jointEntityName(for: joint)
             // REQUIRED for `ARView.entity(at:)` (used by the Edit Pose drag gesture) to ever hit

@@ -62,6 +62,7 @@ struct PlaybackLayerV2: View {
                 PlaybackViewV2(
                     url: videoURL,
                     frameStore: frameStore,
+                    videoAttempt: videoAttempt,
                     recordingSession: recordingSession,
                     sessionController: sessionController,
                     initialVideoAnnotations: videoAnnotations,

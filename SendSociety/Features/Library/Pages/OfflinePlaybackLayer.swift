@@ -63,6 +63,7 @@ struct OfflinePlaybackLayer: View {
             } else {
                 OfflinePlaybackView(
                     url: videoURL,
+                    videoAttempt: videoAttempt,
                     recordingSession: recordingSession,
                     sessionController: sessionController,
                     initialVideoAnnotations: videoAnnotations,
