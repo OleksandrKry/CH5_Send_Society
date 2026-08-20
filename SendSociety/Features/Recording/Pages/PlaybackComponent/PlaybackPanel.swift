@@ -240,9 +240,9 @@ struct PlaybackPanel: View {
             onVideoMarkerClick(videoMarkerModel)
         } label: {
             Image(systemName: videoMarkerModel.has3DPose ? "cube.fill" : "pencil.tip.crop.circle.fill")
-                .font(.system(size: 9))
+                .font(.system(size: 12))
                 .foregroundStyle(.white)
-                .frame(width: 16, height: 16)
+                .frame(width: 24, height: 24)
                 .background(markerColor(for: videoMarkerModel), in: Circle())
         }
         .offset(x: trackWidth * fraction - 8)

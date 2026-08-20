@@ -63,21 +63,22 @@ struct PlaybackOverlay: View {
 //            }
 //            .offset(y: -32)
             Button {
-                // 3D action
                 onGenerate3D()
             } label: {
-                Text("3D")
-                    .font(.title)
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 72,
-                        height: 72
-                    )
-                    .background(.primaryBlue)
+                Image("icon3DPose") // ganti sesuai nama asset PNG kamu di Assets.xcassets
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 40, height: 40)
+                    .frame(width: 72, height: 72)
+                    .background(.primaryLightLessOpacity)
                     .clipShape(Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(.white.opacity(0.8), lineWidth: 1)
+                    }
+                    .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
             }
             .offset(y: -32)
-
             
             Spacer()
             

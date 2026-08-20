@@ -192,8 +192,6 @@ struct Skeleton3DView: View {
 //            modeInstructions
         }
         .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .padding()
     }
 
     private var topButtonRow: some View {
@@ -210,31 +208,30 @@ struct Skeleton3DView: View {
                     } label: {
                         Image(systemName: "chevron.left")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
+                    .clipShape(Circle())
                 }
                 if onDelete != nil {
-                    Button(role: .destructive) {
+                    Button("Delete Visualization", role: .destructive) {
                         isConfirmingDelete = true
-                    } label: {
-                        Label("Delete Visualization", systemImage: "trash")
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(.glass)
                     .tint(.red)
                 }
                 Spacer()
                 editPoseButton
             }
         }
+        .controlSize(.large)
     }
     
     private var doneEditingPoseButton: some View {
-        Button {
+        Button("Done") {
             commitTrigger.commit?()
             interactionMode = .camera
-        } label: {
-            Label("Done", systemImage: "checkmark")
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(.glassProminent)
+        .tint(.blue)
     }
 
     private var approximatePlacementBanner: some View {
@@ -283,21 +280,17 @@ struct Skeleton3DView: View {
     }
 
     private var resetPoseButton: some View {
-        Button {
+        Button("Reset") {
             isConfirmingReset = true
-        } label: {
-            Label("Reset Pose", systemImage: "arrow.trianglehead.2.counterclockwise.rotate.90")
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
     }
 
     private var editPoseButton: some View {
-        Button {
+        Button("Edit Pose") {
             interactionMode = .editPose
-        } label: {
-            Label("Edit Pose", systemImage: "move.3d")
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(.glass)
     }
     
 }
