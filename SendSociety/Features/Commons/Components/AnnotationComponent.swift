@@ -75,7 +75,7 @@ struct AnnotationComponent: View {
                 var path = Path()
                 path.move(to: firstEnd)
                 path.addLine(to: vertex)
-                context.stroke(path, with: .color(.yellow), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                context.stroke(path, with: .color(AppColor.AnnotateGreen), style: StrokeStyle(lineWidth: 3, lineCap: .round))
                 if let liveAngleEnd {
                     draw(stroke: AnnotationStrokeModel(tool: .angle, points: [vertex, firstEnd, liveAngleEnd]), in: &context, isPreview: true)
                 }
@@ -138,13 +138,13 @@ struct AnnotationComponent: View {
             var path = Path()
             path.move(to: stroke.points[0])
             for point in stroke.points.dropFirst() { path.addLine(to: point) }
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            context.stroke(path, with: .color(AppColor.AnnotateRed), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
         case .line:
             guard stroke.points.count >= 2 else { return }
             var path = Path()
             path.move(to: stroke.points[0])
             path.addLine(to: stroke.points[1])
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            context.stroke(path, with: .color(AppColor.AnnotateRed), style: StrokeStyle(lineWidth: 3, lineCap: .round))
         case .angle:
             guard stroke.points.count >= 2 else { return }
             let vertex = stroke.points[0]
@@ -155,11 +155,11 @@ struct AnnotationComponent: View {
             if stroke.points.count >= 3 {
                 path.addLine(to: stroke.points[2])
             }
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            context.stroke(path, with: .color(AppColor.AnnotateGreen), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
             if stroke.points.count >= 3 {
                 let degrees = angleDegrees(vertex: vertex, a: firstEnd, b: stroke.points[2])
                 let label = String(format: "%.0f°", degrees)
-                context.draw(Text(label).font(.headline.bold()).foregroundColor(.yellow), at: CGPoint(x: vertex.x + 14, y: vertex.y - 14))
+                context.draw(Text(label).font(.headline.bold()).foregroundColor(AppColor.AnnotateGreen), at: CGPoint(x: vertex.x + 14, y: vertex.y - 14))
             }
         case .circle:
             guard stroke.points.count >= 2 else { return }
@@ -167,7 +167,7 @@ struct AnnotationComponent: View {
             let edge = stroke.points[1]
             let radius = hypot(edge.x - center.x, edge.y - center.y)
             let rect = CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2)
-            context.stroke(Path(ellipseIn: rect), with: .color(color), style: StrokeStyle(lineWidth: 3))
+            context.stroke(Path(ellipseIn: rect), with: .color(AppColor.AnnotateYellow), style: StrokeStyle(lineWidth: 3))
         case .arrow:
             guard stroke.points.count >= 2 else { return }
             let start = stroke.points[0]
@@ -175,7 +175,7 @@ struct AnnotationComponent: View {
             var path = Path()
             path.move(to: start)
             path.addLine(to: end)
-            context.stroke(path, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+            context.stroke(path, with: .color(AppColor.AnnotateBlue), style: StrokeStyle(lineWidth: 3, lineCap: .round))
 
             let angle = atan2(end.y - start.y, end.x - start.x)
             let arrowLength: CGFloat = 14
@@ -186,7 +186,7 @@ struct AnnotationComponent: View {
             head.move(to: left)
             head.addLine(to: end)
             head.addLine(to: right)
-            context.stroke(head, with: .color(color), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            context.stroke(head, with: .color(AppColor.AnnotateBlue), style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
         case .text:
             break
         }
