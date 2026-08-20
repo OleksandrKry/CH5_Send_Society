@@ -140,11 +140,11 @@ struct AnnotationPanel: View {
             
             // MARK: Text
             
-            annotationButton(
-                tool: .text,
-                icon: "textformat",
-                color: .primaryDark
-            )
+//            annotationButton(
+//                tool: .text,
+//                icon: "textformat",
+//                color: .primaryDark
+//            )
             
             // MARK: Undo
             
