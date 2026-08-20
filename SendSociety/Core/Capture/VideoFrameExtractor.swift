@@ -32,4 +32,57 @@ enum VideoFrameExtractor {
             return nil
         }
     }
+
+    /// Extracts `count` evenly-spaced thumbnails across `range` seconds of the video at `url` —
+    /// backs `PreciseScrubBar`'s visual scrubbing reference. `range` is a narrow (few-second) window
+    /// around the current playhead, not the whole clip: a dense set of frames over a short span gets
+    /// a coach precise enough visual feedback to land on one exact moment. Unlike `extractFrame`
+    /// above, this applies the preferred track transform (`= true`): these thumbnails are for a
+    /// coach to look at, so they need to match what `SilentVideoPlayer` actually displays (which
+    /// auto-applies that same transform), not Vision's raw-buffer expectations.
+    ///
+    /// Uses `generateCGImagesAsynchronously`, NOT a loop of `copyCGImage` calls: for a batch of
+    /// nearby timestamps (exactly this case — a couple of seconds of footage) the batch API reuses
+    /// decode state between adjacent frames instead of re-seeking from scratch for each one, which is
+    /// what made the previous `copyCGImage`-loop version of this function feel laggy the first time
+    /// `PreciseScrubBar` appeared. `copyCGImage` is also blocking, which is why that version needed a
+    /// `Task.detached` wrapper; `generateCGImagesAsynchronously` schedules its own background work
+    /// and calls back via a completion handler, so this function just bridges that into `async`.
+    static func extractThumbnailStrip(from url: URL, range: ClosedRange<Double>, count: Int) async -> [(time: Double, image: CGImage)] {
+        guard range.upperBound.isFinite, range.upperBound > range.lowerBound, count > 0 else { return [] }
+
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+        generator.maximumSize = CGSize(width: 200, height: 200)
+
+        let span = range.upperBound - range.lowerBound
+        let seconds = (0..<count).map { range.lowerBound + span * Double($0) / Double(max(count - 1, 1)) }
+        let times = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) }
+        let requestedValues = times.map { NSValue(time: $0) }
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<[(time: Double, image: CGImage)], Never>) in
+            let lock = NSLock()
+            var imagesByTime: [CMTime: CGImage] = [:]
+            var remaining = requestedValues.count
+
+            generator.generateCGImagesAsynchronously(forTimes: requestedValues) { requestedTime, cgImage, _, status, _ in
+                lock.lock()
+                if status == .succeeded, let cgImage {
+                    imagesByTime[requestedTime] = cgImage
+                }
+                remaining -= 1
+                let isDone = remaining == 0
+                lock.unlock()
+
+                guard isDone else { return }
+                let ordered: [(time: Double, image: CGImage)] = zip(seconds, times).compactMap { second, time in
+                    imagesByTime[time].map { (second, $0) }
+                }
+                continuation.resume(returning: ordered)
+            }
+        }
+    }
 }

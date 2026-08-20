@@ -11,7 +11,8 @@ struct PlaybackOverlay: View {
     
     @Binding var currentTime: Double
     let duration: Double
-    
+    let videoURL: URL
+
     @Binding var isPlaying: Bool
     @Binding var playbackRate: Double
     
@@ -86,6 +87,7 @@ struct PlaybackOverlay: View {
             PlaybackPanel(
                 currentTime: $currentTime,
                 duration: duration,
+                videoURL: videoURL,
                 isPlaying: $isPlaying,
                 playbackRate: $playbackRate,
                 videoMarkerList: videoMarkerList,

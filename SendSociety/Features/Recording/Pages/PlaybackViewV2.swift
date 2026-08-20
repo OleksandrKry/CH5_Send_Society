@@ -139,6 +139,7 @@ struct PlaybackViewV2: View {
                    PlaybackOverlay(
                         currentTime: videoCurrentTime,
                        duration: videoModel.duration,
+                       videoURL: videoURL,
                        isPlaying: videoIsPlaying,
                        playbackRate: $playbackRate,
                         videoMarkerList: getVideoMarkerList,

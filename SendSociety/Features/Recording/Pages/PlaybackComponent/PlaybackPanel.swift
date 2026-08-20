@@ -13,7 +13,8 @@ struct PlaybackPanel: View {
     
     @Binding var currentTime: Double
     let duration: Double
-    
+    let videoURL: URL
+
     @Binding var isPlaying: Bool
     @Binding var playbackRate: Double
     
@@ -21,7 +22,11 @@ struct PlaybackPanel: View {
     
     let videoMarkerList: [VideoMarkerModel]
     let onVideoMarkerClick: (VideoMarkerModel) -> Void
-    
+
+    // MARK: - Precise scrub bar toggle
+
+    @State private var isPreciseScrubberVisible = false
+
     // MARK: - Playback Speeds
     
     private let playbackSpeeds: [Double] = [
@@ -58,16 +63,41 @@ struct PlaybackPanel: View {
                         .frame(height: 16)
                     }
 
-                    Slider(
-                        value: $currentTime,
-                        in: 0...max(duration, 1),
-                        onEditingChanged: { isEditing in
-                            if isEditing {
-                                isPlaying = false
+                    if isPreciseScrubberVisible {
+                        PreciseScrubBar(
+                            currentTime: $currentTime,
+                            duration: duration,
+                            videoURL: videoURL,
+                            isPlaying: $isPlaying
+                        )
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    ZStack {
+                        // The native Slider's own track is thin and low-contrast against the
+                        // panel's `.ultraThinMaterial` background — this capsule gives it a solid
+                        // base to sit on so it doesn't disappear over busy/light video frames.
+                        Capsule()
+                            .fill(.primaryLightLessOpacity)
+                            .frame(height: 6)
+
+                        Slider(
+                            value: $currentTime,
+                            in: 0...max(duration, 1),
+                            onEditingChanged: { isEditing in
+                                if isEditing {
+                                    isPlaying = false
+                                    // The precise scrub bar's ±1s window goes stale the moment the
+                                    // coarse Slider jumps `currentTime` somewhere else — hide it
+                                    // rather than let it show a window around the OLD position.
+                                    withAnimation(.easeInOut(duration: 0.2)) {
+                                        isPreciseScrubberVisible = false
+                                    }
+                                }
                             }
-                        }
-                    )
-                    .tint(.primaryBlue)
+                        )
+                        .tint(.primaryBlue)
+                    }
                 }
                 
                 Text(formatTime(duration))
@@ -171,16 +201,18 @@ struct PlaybackPanel: View {
                 
                 Spacer()
                 
-                // MARK: Frame / Timeline View
-                
+                // MARK: Precise Scrub Bar Toggle
+
                 Button {
-                    // Timeline action
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isPreciseScrubberVisible.toggle()
+                    }
                 } label: {
                     Image(systemName: "rectangle.split.3x1")
                         .font(.system(size: 24))
-                        .foregroundStyle(.primaryDark)
+                        .foregroundStyle(isPreciseScrubberVisible ? .white : .primaryDark)
                         .frame(width: 48, height: 48)
-                        .background(.primaryLightLessOpacity)
+                        .background(isPreciseScrubberVisible ? AnyShapeStyle(.primaryBlue) : AnyShapeStyle(.primaryLightLessOpacity))
                         .clipShape(Circle())
                         .shadow(
                             color: .black.opacity(0.15),
