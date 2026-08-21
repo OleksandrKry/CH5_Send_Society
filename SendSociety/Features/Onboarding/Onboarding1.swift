@@ -12,7 +12,7 @@ struct Onboarding1: View {
     var body: some View {
         VStack {
             
-            Image("Tutorial1")
+            Image("Introduction1")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 600)

@@ -38,10 +38,10 @@ struct InitialScreen: View {
                         goToOnboarding = true
                     } label: {
                         Text("Get Started")
-                            .font(.title)
+                            .font(.system(size: 24))
                             .fontWeight(.bold)
-                            .padding(.vertical,24)
-                            .padding(.horizontal, 100)
+                            .padding(.vertical,20)
+                            .padding(.horizontal, 120)
                             .background(Color(red: 75/255, green: 105/255, blue: 141/255))
                             .clipShape(Capsule())
                             .foregroundColor(.white)

@@ -11,7 +11,7 @@ struct Onboarding3: View {
     var body: some View {
         VStack {
             
-            Image("Tutorial1")
+            Image("Introduction3")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 600)
@@ -29,10 +29,10 @@ struct Onboarding3: View {
             Button(action: {}){
 
                 Text("Get Started")
-                    .font(.title)
+                    .font(.system(size: 24))
                     .fontWeight(.bold)
-                    .padding(.vertical,30)
-                    .padding(.horizontal, 180)
+                    .padding(.vertical,20)
+                    .padding(.horizontal, 120)
                     .background(Color(red: 75/255, green: 105/255, blue: 141/255))
                     .foregroundColor(.white)
                     .cornerRadius(50)

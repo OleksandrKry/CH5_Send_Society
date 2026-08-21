@@ -23,6 +23,12 @@ struct Tutorial1: View {
             
             VStack{
                 Spacer()
+                Image("Tutorial1")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 300)
+                    .padding(40)
+            
                 Text("Scan The Wall!")
                     .font(.largeTitle)
                     .fontWeight(.bold)
@@ -38,10 +44,10 @@ struct Tutorial1: View {
                 Button(action: {}){
 
                     Text("Got it!")
-                        .font(.title)
+                        .font(.system(size: 24))
                         .fontWeight(.bold)
                         .padding(.vertical,20)
-                        .padding(.horizontal, 140)
+                        .padding(.horizontal, 120)
                         .background(Color(red: 141/255, green: 220/255, blue: 220/255))
                         .foregroundColor(.white)
                         .cornerRadius(50)
