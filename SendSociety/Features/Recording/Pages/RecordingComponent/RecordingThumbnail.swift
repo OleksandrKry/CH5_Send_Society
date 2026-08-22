@@ -34,6 +34,8 @@ struct RecordingThumbnail: View {
 
     private func thumbnailButton(for attempt: VideoAttemptV2, index: Int) -> some View {
         let size: CGFloat = 120
+        let deviceOrientation = UIDeviceOrientation(rawValue: attempt.recordingDeviceOrientationRawValue)
+        ?? .portrait
 
         return ZStack {
             Button {
@@ -48,6 +50,7 @@ struct RecordingThumbnail: View {
                         RoundedRectangle(cornerRadius: 20)
                             .stroke(.white, lineWidth: selectedAttempt?.id == attempt.id ? 3 : 0)
                     )
+                    .rotationEffect(.degrees(deviceOrientation == .portrait ? 90 : 0))
             }
             .buttonStyle(.plain)
 

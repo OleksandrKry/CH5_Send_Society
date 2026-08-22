@@ -10,6 +10,7 @@ import SwiftUI
 struct InitialScreen: View {
     
     @State private var goToOnboarding: Bool = false
+    let onFinish: () -> Void
     
     var body: some View {
         
@@ -31,6 +32,7 @@ struct InitialScreen: View {
                     
                     Text("See it. Learn it. Send it.")
                         .font(.system(size: 36, weight: .bold))
+                        .foregroundStyle(.black)
                     
                     Spacer()
                     
@@ -38,10 +40,10 @@ struct InitialScreen: View {
                         goToOnboarding = true
                     } label: {
                         Text("Get Started")
-                            .font(.title)
+                            .font(.system(size: 24))
                             .fontWeight(.bold)
-                            .padding(.vertical,24)
-                            .padding(.horizontal, 100)
+                            .padding(.vertical,20)
+                            .padding(.horizontal, 120)
                             .background(Color(red: 75/255, green: 105/255, blue: 141/255))
                             .clipShape(Capsule())
                             .foregroundColor(.white)
@@ -49,7 +51,7 @@ struct InitialScreen: View {
                             .glassEffect()
                             .padding(.bottom, 40)
                             .navigationDestination(isPresented: $goToOnboarding) {
-                                OnboardingAll()
+                                OnboardingAll(onFinish: onFinish)
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -66,5 +68,5 @@ struct InitialScreen: View {
 }
 
 #Preview {
-    InitialScreen()
+//    InitialScreen(onFinish: <#T##() -> Void#>)
 }

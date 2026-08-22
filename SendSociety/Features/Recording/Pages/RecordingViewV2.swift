@@ -95,35 +95,30 @@ struct RecordingViewV2: View {
                 .ignoresSafeArea()
 
             // MARK: Recording Timer
-            VStack(spacing: 8) {
-//                Text("00:00:00")
-//                    .font(.title2)
-//                    .monospacedDigit()
-//                    .padding(.horizontal, 20)
-//                    .padding(.vertical, 12)
-//                    .glassEffect(.regular, in: Capsule())
-                
+            ZStack {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(formattedElapsed(context.date))
-                        .font(.title2)
+                        .font(.title)
                         .monospacedDigit()
                         .foregroundStyle(recorder.isRecording ? .red : .primary)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
                         .glassEffect(.regular, in: Capsule())
                 }
-
-                if let guidanceMessage {
-                    Text(guidanceMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .glassEffect(.regular, in: Capsule())
-                }
+                .frame(maxHeight: .infinity, alignment: .top)
             }
-            .frame(maxHeight: .infinity, alignment: .top)
-            .padding(.top, 16)
+                
+                if(recorder.isRecording == false){
+                    if let guidanceMessage {
+                        Text(guidanceMessage)
+                            .font(.largeTitle)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .glassEffect(.regular, in: Capsule())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    }
+                }
 
             // MARK: Left Control
             HStack {
