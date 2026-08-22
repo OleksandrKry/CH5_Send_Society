@@ -4,6 +4,7 @@ import SwiftData
 
 @main
 struct SendSocietyApp: App {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     init() {
         // Needed so UIDevice.current.orientation reflects live changes — used by
         // BodyPose3DExtractor to pick the correct CGImagePropertyOrientation for Vision.
@@ -12,9 +13,12 @@ struct SendSocietyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // LibraryView is the app's actual root now — see its doc comment for the overall
-            // navigation shape. ContentView (the Steps 1-4 capture pipeline) is presented FROM it.
-            LibraryView()
+            if hasCompletedOnboarding {
+                LibraryView()
+            } else {
+//                OnboardingFlow(onComplete: { hasCompletedOnboarding = true })
+                InitialScreen(onFinish: { hasCompletedOnboarding = true })
+            }
         }
         // Registers the persistence schema for the whole app — `RecordingSession` is the only
         // `@Model` type (see its doc comment for why child data is flattened into it as JSON

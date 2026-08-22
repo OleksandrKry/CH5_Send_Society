@@ -51,7 +51,7 @@ struct PlaybackPanel: View {
                     .foregroundStyle(.primaryDark)
                     .monospacedDigit()
                 
-                VStack(spacing: 4) {
+                VStack(spacing: 12) {
                     if !videoMarkerList.isEmpty, duration > 0 {
                         GeometryReader { geometry in
                             ZStack(alignment: .leading) {

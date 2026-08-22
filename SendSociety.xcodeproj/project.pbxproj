@@ -54,6 +54,12 @@
 		6851B7BA3032BE3700940510 /* ClimberStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7B93032BE3300940510 /* ClimberStore.swift */; };
 		6851B7BC3032BF5000940510 /* RecordingClimberView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6851B7BB3032BF4400940510 /* RecordingClimberView.swift */; };
 		689F20E630361000001D0E71 /* SilentVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F20E530360FFB001D0E71 /* SilentVideoPlayer.swift */; };
+		689F213430381B67001D0E71 /* OnboardingAll.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F213330381B63001D0E71 /* OnboardingAll.swift */; };
+		689F213630381BA3001D0E71 /* Onboarding1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F213530381B9C001D0E71 /* Onboarding1.swift */; };
+		689F213830381BB7001D0E71 /* Onboarding2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F213730381BB3001D0E71 /* Onboarding2.swift */; };
+		689F213A30381C05001D0E71 /* Onboarding3.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F213930381C01001D0E71 /* Onboarding3.swift */; };
+		689F214030381EFC001D0E71 /* OnboardingFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 689F213F30381EF7001D0E71 /* OnboardingFlow.swift */; };
+		689F215730383BC5001D0E71 /* GetBeta App Icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 689F215630383BC5001D0E71 /* GetBeta App Icon.icon */; };
 		6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F51954CE07428B14B9FF01B5 /* SkeletonPoseEditor.swift */; };
 		75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20B2647AD84A4B6F936DA85C /* CodableSIMD.swift */; };
 		7CF90842E6D24633978BE72F /* VideoFrameExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9580A7E9AC6F41949CB81ABC /* VideoFrameExtractor.swift */; };
@@ -119,6 +125,12 @@
 		6851B7B93032BE3300940510 /* ClimberStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClimberStore.swift; sourceTree = "<group>"; };
 		6851B7BB3032BF4400940510 /* RecordingClimberView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingClimberView.swift; sourceTree = "<group>"; };
 		689F20E530360FFB001D0E71 /* SilentVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SilentVideoPlayer.swift; sourceTree = "<group>"; };
+		689F213330381B63001D0E71 /* OnboardingAll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAll.swift; sourceTree = "<group>"; };
+		689F213530381B9C001D0E71 /* Onboarding1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding1.swift; sourceTree = "<group>"; };
+		689F213730381BB3001D0E71 /* Onboarding2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding2.swift; sourceTree = "<group>"; };
+		689F213930381C01001D0E71 /* Onboarding3.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Onboarding3.swift; sourceTree = "<group>"; };
+		689F213F30381EF7001D0E71 /* OnboardingFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlow.swift; sourceTree = "<group>"; };
+		689F215630383BC5001D0E71 /* GetBeta App Icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "GetBeta App Icon.icon"; sourceTree = "<group>"; };
 		7A2EACC8906161F57BB8245E /* LibraryEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryEngine.swift; sourceTree = "<group>"; };
 		901F77D623A462E5F44D0125 /* JointDragProjector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JointDragProjector.swift; sourceTree = "<group>"; };
 		923E1FFE35ED43AA92BA1AF2 /* DeviceDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceDiagnostics.swift; sourceTree = "<group>"; };
@@ -194,16 +206,17 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
-		2BE3307B303436D7007F4792 /* Onboarding */ = {
+		2BE3307B303436D7007F4792 /* Onboarding 2 */ = {
 			isa = PBXGroup;
 			children = (
+				689F213F30381EF7001D0E71 /* OnboardingFlow.swift */,
+				689F213930381C01001D0E71 /* Onboarding3.swift */,
+				689F213730381BB3001D0E71 /* Onboarding2.swift */,
+				689F213530381B9C001D0E71 /* Onboarding1.swift */,
+				689F213330381B63001D0E71 /* OnboardingAll.swift */,
 				2BE33076303436D7007F4792 /* InitialScreen.swift */,
-				2BE33077303436D7007F4792 /* Tutorial1.swift */,
-				2BE33078303436D7007F4792 /* Tutorial2.swift */,
-				2BE33079303436D7007F4792 /* Tutorial3.swift */,
-				2BE3307A303436D7007F4792 /* TutorialOne.swift */,
 			);
-			path = Onboarding;
+			path = "Onboarding 2";
 			sourceTree = "<group>";
 		};
 		2BE3308B303438AA007F4792 /* DesignSystem */ = {
@@ -236,7 +249,6 @@
 		41F75D8BD2244A8FB1682FD2 /* Reconstruction */ = {
 			isa = PBXGroup;
 			children = (
-				2BE3307B303436D7007F4792 /* Onboarding */,
 				358F98F5A91CBC675D091BA1 /* Pages */,
 				26F50DCE09913BC0078E5F09 /* Components */,
 			);
@@ -258,6 +270,17 @@
 				6851B77C30304F8600940510 /* RecordingThumbnail.swift */,
 			);
 			path = RecordingComponent;
+			sourceTree = "<group>";
+		};
+		689F2155303838EC001D0E71 /* Tutorial */ = {
+			isa = PBXGroup;
+			children = (
+				2BE33077303436D7007F4792 /* Tutorial1.swift */,
+				2BE33078303436D7007F4792 /* Tutorial2.swift */,
+				2BE33079303436D7007F4792 /* Tutorial3.swift */,
+				2BE3307A303436D7007F4792 /* TutorialOne.swift */,
+			);
+			path = Tutorial;
 			sourceTree = "<group>";
 		};
 		832A34B5D1194C9A8D3DDB9D /* Recording */ = {
@@ -332,6 +355,7 @@
 		B0E8DE97AC814F5FA1113BC7 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				689F215630383BC5001D0E71 /* GetBeta App Icon.icon */,
 				4627689E22B94DEBB591BB78 /* Assets.xcassets */,
 				017E50A5312541079C0CCA68 /* Info.plist */,
 			);
@@ -371,6 +395,8 @@
 		DA503DBA94B84CF89FE3BBF5 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				689F2155303838EC001D0E71 /* Tutorial */,
+				2BE3307B303436D7007F4792 /* Onboarding 2 */,
 				41F75D8BD2244A8FB1682FD2 /* Reconstruction */,
 				832A34B5D1194C9A8D3DDB9D /* Recording */,
 				0746646AA5084C3CA66D90F6 /* Library */,
@@ -461,6 +487,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				689F215730383BC5001D0E71 /* GetBeta App Icon.icon in Resources */,
 				9AE9D271DFEB4188832DD8AD /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -484,6 +511,7 @@
 				6851B78930308B4600940510 /* Skeleton3DSceneView.swift in Sources */,
 				6851B77F3030576A00940510 /* Generate3DEngine.swift in Sources */,
 				5AA69FCF5B014BF99A6F3571 /* DebugLog.swift in Sources */,
+				689F213A30381C05001D0E71 /* Onboarding3.swift in Sources */,
 				668D2FDE36D8430C9E10EED4 /* DeveloperSettings.swift in Sources */,
 				6851B75B302F34AA00940510 /* VideoMarkerModel.swift in Sources */,
 				6851B7913030C90400940510 /* RecordingEngineV2.swift in Sources */,
@@ -498,6 +526,8 @@
 				6851B7B83032BDC300940510 /* Climber.swift in Sources */,
 				D3373B559DA7FDC2CCE1AF39 /* SkeletonImageOverlayView.swift in Sources */,
 				6851B7973031D87500940510 /* AppleVisionEstimator.swift in Sources */,
+				689F213430381B67001D0E71 /* OnboardingAll.swift in Sources */,
+				689F213630381BA3001D0E71 /* Onboarding1.swift in Sources */,
 				6851B78F3030C87400940510 /* VideoRecorderEngine.swift in Sources */,
 				6851B785303089FE00940510 /* Skeleton3DView.swift in Sources */,
 				6851B7AB3032B2BD00940510 /* AnnotationComponent.swift in Sources */,
@@ -507,9 +537,11 @@
 				6851B78730308A7F00940510 /* AppleVisionSkeleton.swift in Sources */,
 				9F3042E7A5794DB897BA4FDB /* SendSocietyApp.swift in Sources */,
 				6A486FC48327CB3E4DD890A2 /* SkeletonPoseEditor.swift in Sources */,
+				689F213830381BB7001D0E71 /* Onboarding2.swift in Sources */,
 				6851B7933031D53F00940510 /* LibraryRow.swift in Sources */,
 				4F0F396089DB4A62ABFE8E38 /* UserIdentity.swift in Sources */,
 				6851B78130305BFE00940510 /* Video3DLidarModel.swift in Sources */,
+				689F214030381EFC001D0E71 /* OnboardingFlow.swift in Sources */,
 				689F20E630361000001D0E71 /* SilentVideoPlayer.swift in Sources */,
 				75B89066060A4F8699D2A31E /* CodableSIMD.swift in Sources */,
 				6851B7953031D58200940510 /* OfflinePlaybackView.swift in Sources */,
@@ -661,11 +693,12 @@
 		152F4CC45AA64C33B00C8770 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "GetBeta App Icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V2W2P98U9C;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = 6782G2M9AF;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GetBeta;
@@ -680,23 +713,28 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta1;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Release;
 		};
 		D51B17D9B85F430E8297E719 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "GetBeta App Icon";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = V2W2P98U9C;
+				CURRENT_PROJECT_VERSION = 3;
+				DEVELOPMENT_TEAM = 6782G2M9AF;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SendSociety/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = GetBeta;
@@ -711,12 +749,16 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta1;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sendsociety.getbeta;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 2;
 			};
 			name = Debug;
 		};

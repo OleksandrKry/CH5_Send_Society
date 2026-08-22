@@ -200,6 +200,13 @@ struct LibraryView: View {
                 color: .black.opacity(0.25),
                 radius: 20
             )
+            .overlay{
+                RoundedRectangle(cornerRadius: 24)
+                    .stroke(
+                        Color.white.opacity(0.12),
+                        lineWidth: 2
+                    )
+            }
         } else {
             ProgressView()
         }
