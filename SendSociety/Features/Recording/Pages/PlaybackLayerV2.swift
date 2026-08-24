@@ -23,6 +23,7 @@ struct PlaybackLayerV2: View {
     let recordingSession: RecordingSessionV2?
     let sessionController: SessionStoreV2?
     let onDismiss: () -> Void
+    let onSessionDone: () -> Void
 
     /// nil = showing the video (PlaybackViewV2). Non-nil = showing the 3D view for this result.
     @State private var result: Video3DLidar?
@@ -73,6 +74,7 @@ struct PlaybackLayerV2: View {
                     initialReconstructions: savedReconstructions,
                     initialPlaybackTimestamp: lastPlaybackTimestamp,
                     onDismiss: onDismiss,
+                    onSessionDone: onSessionDone,
                     onVideoAnnotationsChanged: { timestamp, strokes in
                         saveVideoAnnotation(timestampSeconds: timestamp, strokes: strokes)
                     }

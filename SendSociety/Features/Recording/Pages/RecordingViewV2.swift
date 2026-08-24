@@ -35,7 +35,7 @@ struct RecordingViewV2: View {
                 .allowsHitTesting(videoAttempt == nil)
                 .animation(.easeInOut(duration: 0.25), value: videoAttempt == nil)
 
-            recordingThumbnailArea
+//            recordingThumbnailArea
         }
         .onAppear {
             arManager.startIfNeeded()
@@ -48,11 +48,16 @@ struct RecordingViewV2: View {
             arManager.onFrameUpdate = nil
             engine.stop()
         }
-        .onChange(of: videoAttempt?.id) { oldValue, newValue in
-            if oldValue == nil, newValue != nil {
-                arManager.pause()
-            } else if oldValue != nil, newValue == nil {
-                engine.resumeAfterPause()
+//        .onChange(of: videoAttempt?.id) { oldValue, newValue in
+//            if oldValue == nil, newValue != nil {
+//                arManager.pause()
+//            } else if oldValue != nil, newValue == nil {
+//                engine.resumeAfterPause()
+//            }
+//        }
+        .onChange(of: recordingSession?.videoAttempts.count) { _, _ in
+            if videoAttempt == nil {
+                videoAttempt = recordingSession?.videoAttempts.first
             }
         }
 //        testing if fullscreen
@@ -67,7 +72,8 @@ struct RecordingViewV2: View {
                     frameStore: recorder.frameStore,
                     recordingSession: recordingSession,
                     sessionController: sessionController,
-                    onDismiss: { self.videoAttempt = nil }
+                    onDismiss: { self.videoAttempt = nil },
+                    onSessionDone: onSessionDone 
                 )
                 .id(attempt.id)
             }
