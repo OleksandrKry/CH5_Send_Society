@@ -22,6 +22,7 @@ struct PlaybackViewV2: View {
     let sessionController: SessionStoreV2?
     let onGenerate: (URL, ARFrameStore, TimeInterval) -> Void
     let onDismiss: (() -> Void)?
+    let onSessionDone: () -> Void
     
     let onVideoAnnotationsChanged: ((Double, [AnnotationStrokeModel]) -> Void)?
     let initialPlaybackTimestamp: Double?
@@ -48,6 +49,8 @@ struct PlaybackViewV2: View {
     @State private var isUserDrawing: Bool = false
     
     @State private var climberName: String?
+    
+    @State private var isConfirmingEndSession = false
 
     init(
         url: URL,
@@ -61,6 +64,7 @@ struct PlaybackViewV2: View {
         initialReconstructions: [Video3DLidarSkeleton] = [],
         initialPlaybackTimestamp: Double? = nil,
         onDismiss: (() -> Void)? = nil,
+        onSessionDone: @escaping () -> Void,
         onVideoAnnotationsChanged: ((Double, [AnnotationStrokeModel]) -> Void)? = nil,
         onGenerate: @escaping (URL, ARFrameStore, TimeInterval) -> Void
     ) {
@@ -72,6 +76,7 @@ struct PlaybackViewV2: View {
         self.recordingSession = recordingSession
         self.sessionController = sessionController
         self.onDismiss = onDismiss
+        self.onSessionDone = onSessionDone
         self.initialPlaybackTimestamp = initialPlaybackTimestamp
         self.onVideoAnnotationsChanged = onVideoAnnotationsChanged
         self.onGenerate = onGenerate
@@ -153,13 +158,13 @@ struct PlaybackViewV2: View {
                         onGenerate3D: { onGenerate(videoURL, frameStore, videoModel.currentTime) }
                    )
             }
-            .overlay(alignment: .topLeading) {
-                RecordingThumbnail(videoAttempts: videoAttempts, selectedAttempt: $selectedAttempt, sessionController: sessionController, recordingSession: recordingSession)
-                    .frame(maxHeight: 700)
-                    .padding(.leading, 24)
-                    .padding(.top, 60)
-                
-            }
+//            .overlay(alignment: .topLeading) {
+//                RecordingThumbnail(videoAttempts: videoAttempts, selectedAttempt: $selectedAttempt, sessionController: sessionController, recordingSession: recordingSession)
+//                    .frame(maxHeight: 700)
+//                    .padding(.leading, 24)
+//                    .padding(.top, 60)
+//                
+//            }
             .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -172,18 +177,18 @@ struct PlaybackViewV2: View {
                     }
                 }
                 // LEFT
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        // Close action
-                        if let onDismiss {
-                            onDismiss()
-                        } else {
-                            dismiss()
-                        }
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                }
+//                ToolbarItem(placement: .topBarLeading) {
+//                    Button {
+//                        // Close action
+//                        if let onDismiss {
+//                            onDismiss()
+//                        } else {
+//                            dismiss()
+//                        }
+//                    } label: {
+//                        Image(systemName: "xmark")
+//                    }
+//                }
                 
                 
                 // RIGHT
@@ -195,12 +200,14 @@ struct PlaybackViewV2: View {
 //                        Image(systemName: "figure")
 //                    }
                     
-                    Button {
-                        // More action
-                    } label: {
-                        Image(systemName: "questionmark")
+//                    Button {
+//                        // More action
+//                    } label: {
+//                        Image(systemName: "questionmark")
+//                    }
+                    Button("Save Session") {
+                        onSessionDone()
                     }
-                    
 //                    Button {
 //                        // Share action
 //                    } label: {
@@ -251,6 +258,7 @@ struct PlaybackViewV2: View {
         videoAttempts: [],
         selectedAttempt: .constant(nil),
         recordingSession: nil,
-        sessionController: nil
+        sessionController: nil,
+        onSessionDone: {}
     ) { _, _, _ in }
 }

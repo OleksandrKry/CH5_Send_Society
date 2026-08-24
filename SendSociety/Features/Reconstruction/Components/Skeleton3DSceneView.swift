@@ -381,6 +381,9 @@ struct Skeleton3DSceneView: UIViewRepresentable {
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             parent.isEditingPose
         }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            true
+        }
 
         @objc func handleJointTouch(_ gesture: UILongPressGestureRecognizer) {
             guard let view = gesture.view else { return }
@@ -428,7 +431,7 @@ struct Skeleton3DSceneView: UIViewRepresentable {
                 } else if isDraggingWholeBody, let last = lastBodyDragLocation {
                     updateBodyDrag(from: last, to: location)
                     lastBodyDragLocation = location
-                } else if selection == nil, let last = lastOrbitTouchLocation {
+                } else if selection == nil, let last = lastOrbitTouchLocation, gesture.numberOfTouches == 1 {
                     let dx = Float(location.x - last.x)
                     let dy = Float(location.y - last.y)
                     azimuth -= dx * 0.005

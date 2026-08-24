@@ -35,7 +35,7 @@ struct RecordingViewV2: View {
                 .allowsHitTesting(videoAttempt == nil)
                 .animation(.easeInOut(duration: 0.25), value: videoAttempt == nil)
 
-            recordingThumbnailArea
+//            recordingThumbnailArea
         }
         .onAppear {
             arManager.startIfNeeded()
@@ -48,11 +48,16 @@ struct RecordingViewV2: View {
             arManager.onFrameUpdate = nil
             engine.stop()
         }
-        .onChange(of: videoAttempt?.id) { oldValue, newValue in
-            if oldValue == nil, newValue != nil {
-                arManager.pause()
-            } else if oldValue != nil, newValue == nil {
-                engine.resumeAfterPause()
+//        .onChange(of: videoAttempt?.id) { oldValue, newValue in
+//            if oldValue == nil, newValue != nil {
+//                arManager.pause()
+//            } else if oldValue != nil, newValue == nil {
+//                engine.resumeAfterPause()
+//            }
+//        }
+        .onChange(of: recordingSession?.videoAttempts.count) { _, _ in
+            if videoAttempt == nil {
+                videoAttempt = recordingSession?.videoAttempts.first
             }
         }
 //        testing if fullscreen
@@ -67,22 +72,23 @@ struct RecordingViewV2: View {
                     frameStore: recorder.frameStore,
                     recordingSession: recordingSession,
                     sessionController: sessionController,
-                    onDismiss: { self.videoAttempt = nil }
+                    onDismiss: { self.videoAttempt = nil },
+                    onSessionDone: onSessionDone 
                 )
                 .id(attempt.id)
             }
         }
         .confirmationDialog(
-            "End this session?",
+            "Save this session?",
             isPresented: $isConfirmingEndSession,
             titleVisibility: .visible
         ) {
-            Button("End Session", role: .destructive) {
+            Button("Save Session", role: .destructive) {
                 onSessionDone()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will stop recording and close the session.")
+            Text("This will stop recording and save the session.")
         }
     }
 
@@ -110,13 +116,22 @@ struct RecordingViewV2: View {
                 
                 if(recorder.isRecording == false){
                     if let guidanceMessage {
-                        Text(guidanceMessage)
-                            .font(.largeTitle)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .glassEffect(.regular, in: Capsule())
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        VStack(spacing: 16) {
+                            Text(guidanceMessage)
+                                .font(.largeTitle)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .glassEffect(.regular, in: Capsule())
+                            
+                            if(guidanceMessage == "Ready — tap Record"){
+                                Text("\(Image(systemName: "exclamationmark.triangle")) TAP RECORD BEFORE THE CLIMBER STARTS.")
+                                    .font(.largeTitle)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .glassEffect(.regular, in: Capsule())
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     }
                 }
 
@@ -194,20 +209,22 @@ struct RecordingViewV2: View {
             .padding(.trailing, 48)
 
             // MARK: Close
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button("End Session") {
-                        
-                        isConfirmingEndSession = true
-                        // Close recording
-                    }
-                    .buttonStyle(.glass)
-                }
-            }
-            .padding(.trailing, 48)
-            .padding(.bottom, 32)
+//            VStack {
+//                Spacer()
+//                HStack {
+//                    Spacer()
+//                    Button {
+//                        isConfirmingEndSession = true
+//                        // Close recording
+//                    } label: {
+//                        Text("Save Session")
+//                            .font(.largeTitle.bold())
+//                    }
+//                    .buttonStyle(.glass)
+//                }
+//            }
+//            .padding(.trailing, 48)
+//            .padding(.bottom, 32)
         }
     }
 

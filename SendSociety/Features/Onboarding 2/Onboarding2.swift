@@ -13,13 +13,13 @@ struct Onboarding2: View {
             let isLandscape = geometry.size.width > geometry.size.height
             VStack {
                 if isLandscape {
-                    Image("Introduction2")
+                    Image("Intro1")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 420)
                         .padding(40)
                 } else{
-                    Image("Introduction2")
+                    Image("Intro1")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 600)
