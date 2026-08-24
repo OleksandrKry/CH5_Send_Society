@@ -42,6 +42,7 @@ struct Skeleton3DView: View {
     @State private var isConfirmingReset = false
     
     @State private var lastKnownSavedAnnotationStrokes: [AnnotationStrokeModel] = []
+    @State private var isShowingPoseHint = false
     
     enum SkeletonInteractionMode {
         case camera      // default: orbit/pan the 3D view
@@ -116,6 +117,9 @@ struct Skeleton3DView: View {
                 AnnotationComponent(annotationState: annotationState, isInteractive: false).ignoresSafeArea()
             }
             headerPanel
+            if isShowingPoseHint {
+                poseHintOverlay
+            }
         }
         .overlay(alignment: .bottomTrailing) {
             if (interactionMode != .editPose) {
@@ -176,6 +180,42 @@ struct Skeleton3DView: View {
             commitTrigger: commitTrigger)
             .ignoresSafeArea()
     }
+    
+    private var poseHintOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture { isShowingPoseHint = false }
+
+            VStack(alignment: .leading, spacing: 16) {
+                Text("How to move the pose")
+                    .font(.headline)
+                Text("Tap any joint to show the moving arrow")
+                    .font(.caption)
+                hintRow(color: .green, text: "Green arrow — drag left or right")
+                hintRow(color: .blue, text: "Blue arrow — drag up or down")
+                hintRow(color: .purple, text: "Purple arrow — drag toward or away from the wall")
+                hintRow(color: AppColor.AnnotateGreen, text: "Tap the blue hip joint — move the whole body at once")
+                hintRow(color: .yellow, text: "Tap any other joint — move just that joint")
+
+                Button("Got it") {
+                    isShowingPoseHint = false
+                }
+                .buttonStyle(.borderedProminent)
+                .frame(maxWidth: 360)
+            }
+            .padding(24)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding(40)
+        }
+    }
+
+    private func hintRow(color: Color, text: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Circle().fill(color).frame(width: 14, height: 14).padding(.top, 4)
+            Text(text).font(.subheadline)
+        }
+    }
 
     // MARK: - Top overlay panel: back/done/delete buttons, mode controls, status text
 
@@ -198,6 +238,7 @@ struct Skeleton3DView: View {
         HStack {
             if isEditingPose {
                 Spacer()
+                poseHintButton
                 resetPoseButton
                 doneEditingPoseButton
             } else {
@@ -232,6 +273,14 @@ struct Skeleton3DView: View {
         }
         .buttonStyle(.glassProminent)
         .tint(.blue)
+    }
+    private var poseHintButton: some View {
+        Button {
+            isShowingPoseHint = true
+        } label: {
+            Image(systemName: "questionmark")
+        }
+        .buttonStyle(.glass)
     }
 
     private var approximatePlacementBanner: some View {

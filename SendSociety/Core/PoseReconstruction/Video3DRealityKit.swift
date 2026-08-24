@@ -559,6 +559,7 @@ enum Video3DRealityKit {
         // visible regardless of how the wall's lit material renders — this is the thing the
         // coach is actually here to look at.
         let jointMaterial = UnlitMaterial(color: .systemYellow)
+        let rootJointMaterial = UnlitMaterial(color: .annotateGreen)  // ← new — pick whatever reads clearly against yellow/red/green
         let boneMaterial = UnlitMaterial(color: .systemRed)
         var mannequinMaterial = SimpleMaterial(color: UIColor(red: 0.86, green: 0.71, blue: 0.6, alpha: 0.92), roughness: 0.7, isMetallic: false)
         mannequinMaterial.faceCulling = .none
@@ -592,8 +593,10 @@ enum Video3DRealityKit {
 
         for (joint, position) in worldPositions {
             let isBeingDragged = (joint == selectedJoint) && (draggedAxis != nil)
-            let material = UnlitMaterial(color: isBeingDragged ? draggedAxis!.color : .systemYellow)
+            let baseMaterial = (joint == .root) ? rootJointMaterial : jointMaterial
+            let material = isBeingDragged ? UnlitMaterial(color: draggedAxis!.color) : baseMaterial
             let radius: Float = 0.035
+            
             let sphere = ModelEntity(mesh: .generateSphere(radius: radius), materials: [material])
             sphere.position = position
             sphere.name = jointEntityName(for: joint)
@@ -692,9 +695,9 @@ enum Video3DRealityKit {
     }
     
     private static func axisGizmoEntities(at origin: SIMD3<Float>, handleLength: Float, activeAxis: GizmoAxis?) -> [Entity] {
-        let coneHeight: Float = 0.03
-        let coneRadius: Float = 0.012
-        let shaftRadius: Float = 0.006
+        let coneHeight: Float = 0.06
+        let coneRadius: Float = 0.024
+        let shaftRadius: Float = 0.012
 
         return GizmoAxis.allCases.flatMap { axis -> [Entity] in
             let material = UnlitMaterial(color: axis.color)

@@ -49,6 +49,8 @@ struct PlaybackViewV2: View {
     @State private var isUserDrawing: Bool = false
     
     @State private var climberName: String?
+    
+    @State private var isConfirmingEndSession = false
 
     init(
         url: URL,
@@ -175,18 +177,18 @@ struct PlaybackViewV2: View {
                     }
                 }
                 // LEFT
-                ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        // Close action
-                        if let onDismiss {
-                            onDismiss()
-                        } else {
-                            dismiss()
-                        }
-                    } label: {
-                        Image(systemName: "xmark")
-                    }
-                }
+//                ToolbarItem(placement: .topBarLeading) {
+//                    Button {
+//                        // Close action
+//                        if let onDismiss {
+//                            onDismiss()
+//                        } else {
+//                            dismiss()
+//                        }
+//                    } label: {
+//                        Image(systemName: "xmark")
+//                    }
+//                }
                 
                 
                 // RIGHT

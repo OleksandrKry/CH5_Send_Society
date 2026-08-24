@@ -119,17 +119,17 @@ struct RecordingViewV2: View {
                         VStack(spacing: 16) {
                             Text(guidanceMessage)
                                 .font(.largeTitle)
-                                .foregroundStyle(.white)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 8)
                                 .glassEffect(.regular, in: Capsule())
                             
-                            Text("\(Image(systemName: "exclamationmark.triangle")) TAP RECORD BEFORE THE CLIMBER STARTS.")
-                                .font(.largeTitle)
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .glassEffect(.regular, in: Capsule())
+                            if(guidanceMessage == "Ready — tap Record"){
+                                Text("\(Image(systemName: "exclamationmark.triangle")) TAP RECORD BEFORE THE CLIMBER STARTS.")
+                                    .font(.largeTitle)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .glassEffect(.regular, in: Capsule())
+                            }
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     }
@@ -209,22 +209,22 @@ struct RecordingViewV2: View {
             .padding(.trailing, 48)
 
             // MARK: Close
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button {
-                        isConfirmingEndSession = true
-                        // Close recording
-                    } label: {
-                        Text("Save Session")
-                            .font(.largeTitle.bold())
-                    }
-                    .buttonStyle(.glass)
-                }
-            }
-            .padding(.trailing, 48)
-            .padding(.bottom, 32)
+//            VStack {
+//                Spacer()
+//                HStack {
+//                    Spacer()
+//                    Button {
+//                        isConfirmingEndSession = true
+//                        // Close recording
+//                    } label: {
+//                        Text("Save Session")
+//                            .font(.largeTitle.bold())
+//                    }
+//                    .buttonStyle(.glass)
+//                }
+//            }
+//            .padding(.trailing, 48)
+//            .padding(.bottom, 32)
         }
     }
 
