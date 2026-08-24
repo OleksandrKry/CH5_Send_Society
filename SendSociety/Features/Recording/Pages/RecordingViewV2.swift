@@ -79,16 +79,16 @@ struct RecordingViewV2: View {
             }
         }
         .confirmationDialog(
-            "End this session?",
+            "Save this session?",
             isPresented: $isConfirmingEndSession,
             titleVisibility: .visible
         ) {
-            Button("End Session", role: .destructive) {
+            Button("Save Session", role: .destructive) {
                 onSessionDone()
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This will stop recording and close the session.")
+            Text("This will stop recording and save the session.")
         }
     }
 
@@ -116,13 +116,22 @@ struct RecordingViewV2: View {
                 
                 if(recorder.isRecording == false){
                     if let guidanceMessage {
-                        Text(guidanceMessage)
-                            .font(.largeTitle)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .glassEffect(.regular, in: Capsule())
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        VStack(spacing: 16) {
+                            Text(guidanceMessage)
+                                .font(.largeTitle)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .glassEffect(.regular, in: Capsule())
+                            
+                            Text("\(Image(systemName: "exclamationmark.triangle")) TAP RECORD BEFORE THE CLIMBER STARTS.")
+                                .font(.largeTitle)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .glassEffect(.regular, in: Capsule())
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                     }
                 }
 
@@ -204,10 +213,12 @@ struct RecordingViewV2: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    Button("End Session") {
-                        
+                    Button {
                         isConfirmingEndSession = true
                         // Close recording
+                    } label: {
+                        Text("Save Session")
+                            .font(.largeTitle.bold())
                     }
                     .buttonStyle(.glass)
                 }
