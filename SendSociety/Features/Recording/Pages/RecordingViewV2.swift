@@ -15,6 +15,7 @@ struct RecordingViewV2: View {
     let sessionController: SessionStoreV2?
     let onSessionDone: () -> Void   // NEW
     @State private var recordingTimer: Date?
+    @Environment(\.dismiss) private var dismiss
 
     @StateObject private var engine: RecordingEngineV2
     @State private var isConfirmingEndSession = false
@@ -99,7 +100,26 @@ struct RecordingViewV2: View {
                 .ignoresSafeArea()
             ARMeshSceneView(session: arManager.session, showMesh: false)
                 .ignoresSafeArea()
-
+            
+            // MARK: Close Button
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.title2.weight(.semibold))
+                            .frame(width: 56, height: 56)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular, in: Circle())
+                    Spacer()
+                }
+                Spacer()
+            }
+            .padding(.leading, 32)
+            
             // MARK: Recording Timer
             ZStack {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -146,11 +166,10 @@ struct RecordingViewV2: View {
 //                }
 //                .buttonStyle(.plain)
 //                .glassEffect(.regular, in: Circle())
-
                 Spacer()
             }
             .padding(.horizontal, 44)
-
+            
             // MARK: Right Controls
             VStack(spacing: 16) {
 //                Button {
